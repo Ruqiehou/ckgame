@@ -37,6 +37,7 @@ async function act(payload) {
   try {
     const s = await apiAction(payload);
     applyState(s);
+    checkTutorialProgress(payload);
   } catch (e) {
     console.error(e);
     alert("操作失败: " + e.message);
@@ -52,7 +53,7 @@ function renderAll() {
   const p = state.player;
   const exh = state.player_war_exhaustion != null ? ` · 战疲 ${state.player_war_exhaustion}` : "";
   document.getElementById("player-summary").textContent = p
-    ? `${p.name} · ${p.title} · 金 ${p.gold} · 威望 ${p.prestige} · 军 ${p.men}${exh}`
+    ? `${p.name} · ${p.title} · Lv.${p.level} · 金 ${p.gold} · 威望 ${p.prestige} · 军 ${p.men}${exh}`
     : "无玩家";
 
   renderPlayerSelect();
@@ -68,9 +69,13 @@ function renderAll() {
   renderSchemes();
   renderCouncil();
   renderClaims();
+  renderCharacterList();
   renderDiplomacy();
   renderCountyBuildings();
   renderCheat();
+  renderStorylines();
+  renderTutorial();
+  detectTutorialAction();
 }
 
 // ── 玩家选择 ─────────────────────────────────
@@ -95,6 +100,7 @@ function renderPlayerDetail() {
     ? `
       <div class="row"><span class="muted">月入</span><span>${p.income}</span></div>
       <div class="row"><span class="muted">虔诚 / 压力 / 健康</span><span>${p.piety} / ${p.stress} / ${p.health}</span></div>
+      <div class="row"><span class="muted">等级 / 经验</span><span>Lv.${p.level} · ${p.xp} / ${p.xp_to_next} XP</span></div>
       <div class="row"><span class="muted">属性</span><span>
         外${p.attrs.diplomacy} 军${p.attrs.martial} 管${p.attrs.stewardship}
         谋${p.attrs.intrigue} 学${p.attrs.learning} 武${p.attrs.prowess}
@@ -154,12 +160,20 @@ function renderMap() {
   }
   for (const c of state.counties || []) {
     const cls = ["county", selectedCounty === c.id ? "selected" : "", c.is_player ? "player-land" : ""].filter(Boolean).join(" ");
-    parts.push(`<polygon class="${cls}" data-id="${c.id}" points="${c.points}" fill="${c.color}" opacity="0.92"/>`);
+    const strokeColor = selectedCounty === c.id ? "#ffd700" : (c.is_player ? "#4ecdc4" : "none");
+    const strokeWidth = selectedCounty === c.id ? "3" : "1";
+    parts.push(`<polygon class="${cls}" data-id="${c.id}" points="${c.points}" fill="${c.color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" opacity="0.92"/>`);
     parts.push(`<text class="county-label" x="${c.cx}" y="${c.cy + 4}">${c.name}</text>`);
     if (c.siege) {
       const pct = Math.min(100, (c.siege.progress / c.siege.required) * 100);
       parts.push(`<rect x="${c.cx - 28}" y="${c.cy + 12}" width="56" height="5" fill="#000" opacity="0.5" rx="2"/>`);
       parts.push(`<rect x="${c.cx - 28}" y="${c.cy + 12}" width="${56 * pct / 100}" height="5" fill="#e35d6a" rx="2"/>`);
+    }
+    // 添加省份控制值指示器
+    if (c.control < 100) {
+      const ctrlWidth = 40 * (c.control / 100);
+      parts.push(`<rect x="${c.cx - 20}" y="${c.cy + 20}" width="40" height="3" fill="#000" opacity="0.4" rx="1"/>`);
+      parts.push(`<rect x="${c.cx - 20}" y="${c.cy + 20}" width="${ctrlWidth}" height="3" fill="#4ecdc4" opacity="0.8" rx="1"/>`);
     }
   }
   for (const a of state.armies || []) {
@@ -170,12 +184,16 @@ function renderMap() {
     const menK = a.men >= 1000 ? (a.men / 1000).toFixed(1) + "k" : String(a.men);
     const sup = Math.max(0, Math.min(100, a.supply != null ? a.supply : 100));
     const barColor = sup < 25 ? "#e35d6a" : sup < 50 ? "#e0a84a" : "#3ecf8e";
+    const isSelected = selectedArmy === a.id;
+    const selStroke = isSelected ? "#ffd700" : (a.in_enemy ? "#ff8a80" : "none");
+    const selStrokeWidth = isSelected ? 3 : 1.5;
     parts.push(`
       <g class="${cls}" data-army="${a.id}" transform="translate(${a.cx},${a.cy})">
-        <circle r="12" fill="${fill}" stroke="${a.in_enemy ? "#ff8a80" : "none"}" stroke-width="1.5"/>
+        <circle r="${isSelected ? 14 : 12}" fill="${fill}" stroke="${selStroke}" stroke-width="${selStrokeWidth}"/>
         <text y="4">${menK}</text>
         <rect x="-14" y="14" width="28" height="3.5" fill="#000" opacity="0.45" rx="1"/>
         <rect x="-14" y="14" width="${(28 * sup) / 100}" height="3.5" fill="${barColor}" rx="1"/>
+        ${isSelected ? `<circle r="18" fill="none" stroke="#ffd700" stroke-width="1" opacity="0.5"/>` : ""}
       </g>
     `);
   }
@@ -193,17 +211,27 @@ function renderMap() {
       }
       act({ action: "select_county", county_id: id });
     });
+    el.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      act({ action: "select_county", county_id: null });
+      act({ action: "select_army", army_id: null });
+    });
   });
   svg.querySelectorAll(".army").forEach((el) => {
     el.addEventListener("click", (ev) => {
       ev.stopPropagation();
       act({ action: "select_army", army_id: Number(el.dataset.army) });
     });
+    el.addEventListener("contextmenu", (ev) => {
+      ev.preventDefault();
+      act({ action: "select_army", army_id: null });
+      act({ action: "select_county", county_id: null });
+    });
   });
 }
 
 // ── 省份详情 ─────────────────────────────────
-function renderCounty() {
+  function renderCounty() {
   const box = document.getElementById("county-detail");
   const c = (state.counties || []).find((x) => x.id === selectedCounty);
   if (!c) {
@@ -211,13 +239,14 @@ function renderCounty() {
     return;
   }
   const army = (state.armies || []).find((x) => x.id === selectedArmy);
+  const controlColor = c.control > 70 ? "#3ecf8e" : c.control > 40 ? "#e0a84a" : "#e35d6a";
   box.innerHTML = `
     <div><strong>${c.name}</strong> <span class="tag">${c.terrain}</span>
       ${c.is_player ? '<span class="tag ok">己方</span>' : ""}
       ${c.siege ? '<span class="tag war">围城中</span>' : ""}
     </div>
     <div class="row"><span class="muted">领主</span><span>${c.holder_name}</span></div>
-    <div class="row"><span class="muted">发展 / 控制</span><span>${c.development} / ${c.control}</span></div>
+    <div class="row"><span class="muted">发展 / 控制</span><span>${c.development} / <span style="color:${controlColor}">${c.control}</span></span></div>
     <div class="row"><span class="muted">征召 / 税 / 要塞</span><span>${c.levies} / ${c.tax} / ${c.fort}</span></div>
     <div class="muted" style="margin-top:6px">当前军团: ${
       army ? `${army.name} (${army.men}人 · 补给 ${army.supply ?? "—"} · 士气 ${army.morale ?? "—"}${army.in_enemy ? " · 敌境" : ""})` : "未选择"
@@ -234,9 +263,27 @@ function renderCountyBuildings() {
     return;
   }
   const buildings = c.buildings || [];
-  box.innerHTML = buildings.length
-    ? buildings.map((b) => `<span class="tag">${escapeHtml(b)}</span>`).join(" ")
-    : `<span class="muted">无建筑</span>`;
+  if (!buildings.length) {
+    box.innerHTML = `<span class="muted">无建筑。选择己方省份可建造建筑。</span>`;
+    return;
+  }
+  box.innerHTML = buildings.map((b) => {
+    const canUpgrade = b.can_upgrade;
+    const upgradeBtn = canUpgrade
+      ? `<button class="mini upgrade-btn" data-kind="${b.kind}" ${!c.is_player ? 'disabled' : ''}>升级 (${b.upgrade_cost}金)</button>`
+      : b.level >= b.max_level ? `<span class="muted">已满级</span>` : "";
+    return `<div class="building-item">
+      <div><strong>${b.name}</strong> <span class="tag">Lv.${b.level}/${b.max_level}</span></div>
+      <div class="muted" style="font-size:12px;margin:2px 0">${b.description}</div>
+      <div>${upgradeBtn}</div>
+    </div>`;
+  }).join("");
+  box.querySelectorAll(".upgrade-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (!selectedCounty) return alert("请先选择省份");
+      act({ action: "upgrade_building", county_id: selectedCounty, building_kind: btn.dataset.kind });
+    });
+  });
 }
 
 // ── 军团详情 ─────────────────────────────────
@@ -250,11 +297,14 @@ function renderArmyDetail() {
     if (cmdSel) cmdSel.innerHTML = "";
     return;
   }
+  const moraleColor = army.morale > 70 ? "#3ecf8e" : army.morale > 40 ? "#e0a84a" : "#e35d6a";
+  const supplyColor = army.supply > 70 ? "#3ecf8e" : army.supply > 40 ? "#e0a84a" : "#e35d6a";
   box.innerHTML = `
     <div><strong>${army.name}</strong></div>
     <div class="row"><span class="muted">兵力</span><span>${army.men}</span></div>
     <div class="row"><span class="muted">状态</span><span>${army.status}</span></div>
-    <div class="row"><span class="muted">补给 / 士气</span><span>${army.supply} / ${army.morale}</span></div>
+    <div class="row"><span class="muted">补给</span><span style="color:${supplyColor}">${army.supply}</span></div>
+    <div class="row"><span class="muted">士气</span><span style="color:${moraleColor}">${army.morale}</span></div>
     <div class="row"><span class="muted">位置</span><span>${army.location_name}</span></div>
   `;
   // 填充指挥官候选
@@ -276,29 +326,31 @@ function renderWars() {
     const wpBtn = w.involves_player && w.can_white_peace
       ? `<button class="mini" data-white-peace="${w.id}">白和</button>`
       : w.involves_player ? `<span class="muted"> · ${w.months || 0}月</span>` : "";
-    return `<div class="list-row"><span><span class="tag war">${w.cb}</span>${w.attacker} vs ${w.defender} · 分 ${w.warscore}${w.involves_player ? " · 你" : ""}</span>${wpBtn}</div>`;
+    const progress = Math.min(100, Math.round((w.battle_progress || 0) * 100));
+    return `<div class="list-row"><span><span class="tag war">${w.cb}</span>${w.attacker} vs ${w.defender} · 分 ${w.warscore}${w.involves_player ? " · 你" : ""}</span>${wpBtn}<div class="war-progress"><div class="war-progress-bar" style="width: ${progress}%"></div></div></div>`;
   }).join("");
   box.querySelectorAll("[data-white-peace]").forEach((btn) => {
-    btn.addEventListener("click", () => act({ action: "white_peace", war_id: Number(btn.dataset.whitePeace) }));
+    btn.addEventListener("click", () => act({ action: "white_peace", war_id: Number(btn.dataset.white_peace) }));
   });
 }
 
 // ── 派系 ─────────────────────────────────
-function renderFactions() {
-  const box = document.getElementById("factions");
-  if (!box) return;
-  const factions = state.factions || [];
-  if (!factions.length) {
-    box.innerHTML = `<div class="muted">无活跃派系</div>`;
-    return;
+  function renderFactions() {
+    const box = document.getElementById("factions");
+    if (!box) return;
+    const factions = state.factions || [];
+    if (!factions.length) {
+      box.innerHTML = `<div class="muted">无活跃派系</div>`;
+      return;
+    }
+    box.innerHTML = factions.map((f) => {
+      const discontentColor = f.discontent > 70 ? "#e35d6a" : f.discontent > 40 ? "#e0a84a" : "#3ecf8e";
+      return `<div class="list-row"><span><span class="tag">${f.kind}</span>成员${f.members} · 力${f.power} · <span style="color:${discontentColor}">不满${f.discontent}</span>${f.ultimatum ? ' <span class="tag war">最后通牒</span>' : ""}</span><button class="mini" data-appease="${f.id}">安抚(25金)</button></div>`;
+    }).join("");
+    box.querySelectorAll("[data-appease]").forEach((btn) => {
+      btn.addEventListener("click", () => act({ action: "appease_faction", faction_id: Number(btn.dataset.appease) }));
+    });
   }
-  box.innerHTML = factions.map((f) =>
-    `<div class="list-row"><span><span class="tag">${f.kind}</span>成员${f.members} · 力${f.power} · 不满${f.discontent}${f.ultimatum ? ' <span class="tag war">最后通牒</span>' : ""}</span><button class="mini" data-appease="${f.id}">安抚(25金)</button></div>`
-  ).join("");
-  box.querySelectorAll("[data-appease]").forEach((btn) => {
-    btn.addEventListener("click", () => act({ action: "appease_faction", faction_id: Number(btn.dataset.appease) }));
-  });
-}
 
 // ── 阴谋 ─────────────────────────────────
 function renderSchemes() {
@@ -341,6 +393,8 @@ function renderCouncil() {
   box.innerHTML = council.members.map((m) => {
     const taskOpts = tasks.map(([k, v]) => `<option value="${k}"${k === m.task ? " selected" : ""}>${v}</option>`).join("");
     const charOpts = chars.map((c) => `<option value="${c.id}"${c.id === m.holder_id ? " selected" : ""}>${c.name}（${c.attrs ? "外" + c.attrs.diplomacy + " 军" + c.attrs.martial + " 管" + c.attrs.stewardship + " 谋" + c.attrs.intrigue + " 学" + c.attrs.learning : ""}）</option>`).join("");
+    const holder = chars.find((c) => c.id === m.holder_id);
+    const holderName = holder ? holder.name : "空缺";
     return `<div class="council-row">
       <div class="row"><span class="muted">${m.position_zh}</span>
         <select class="council-char" data-position="${m.position}"><option value="">（空缺）</option>${charOpts}</select>
@@ -348,6 +402,7 @@ function renderCouncil() {
       <div class="row"><span class="muted">任务</span>
         <select class="council-task" data-position="${m.position}">${taskOpts}</select>
       </div>
+      <div class="row"><span class="muted">现任</span><span>${holderName}</span></div>
     </div>`;
   }).join("");
   box.querySelectorAll(".council-char").forEach((sel) => {
@@ -378,6 +433,30 @@ function renderClaims() {
   ).join("");
 }
 
+// ── 角色列表 ─────────────────────────────────
+function renderCharacterList() {
+  const box = document.getElementById("character-list");
+  if (!box) return;
+  const chars = (state.characters || []).slice().sort((a, b) => (b.level || 1) - (a.level || 1));
+  if (!chars.length) {
+    box.innerHTML = `<div class="muted">无角色</div>`;
+    return;
+  }
+  box.innerHTML = chars.map((c) => {
+    const isPlayer = state.player && c.id === state.player.id;
+    const levelColor = c.level >= 4 ? "#3ecf8e" : c.level >= 3 ? "#e0a84a" : "#cfd6e4";
+    return `<div class="list-row">
+      <span>
+        <span class="tag${isPlayer ? " ok" : ""}">${c.name}</span>
+        <span style="color:${levelColor};font-weight:bold;">Lv.${c.level}</span>
+        <span class="muted">${c.xp || 0}/${c.xp_to_next || 100} XP</span>
+        <span class="muted">· ${c.title || "无头衔"}</span>
+        ${c.is_ruler ? '<span class="tag war">统治者</span>' : ""}
+      </span>
+    </div>`;
+  }).join("");
+}
+
 // ── 外交 ─────────────────────────────────
 function renderDiplomacy() {
   const sel = document.getElementById("dipl-char-select");
@@ -397,6 +476,9 @@ function renderDiplomacy() {
     if (target.relation_rival) flags.push('<span class="tag war">宿敌</span>');
     if (target.relation_at_war) flags.push('<span class="tag war">交战</span>');
     if (target.relation_marriage) flags.push('<span class="tag">联姻</span>');
+    if (target.relation_vassalage) flags.push('<span class="tag">附庸</span>');
+    if (target.relation_trade_agreement) flags.push('<span class="tag ok">贸易</span>');
+    if (target.relation_intelligence_sharing) flags.push('<span class="tag">情报</span>');
     detail.innerHTML = `
       <div><strong>${target.name}</strong> ${flags.join("")}</div>
       <div class="row"><span class="muted">头衔</span><span>${target.title || "无"}</span></div>
@@ -421,11 +503,61 @@ function renderDiplomacy() {
 function renderCheat() {
   const box = document.getElementById("cheat-status");
   if (!box) return;
+  let html = "";
   if (state.cheat_mode) {
-    box.innerHTML = `<span class="tag war">★ 已开启</span> 金币/威望/虔诚自动补满，压力归零`;
+    html += `<span class="tag war">★ 作弊已开启</span> 金币/威望/虔诚自动补满，压力归零<br>`;
   } else {
-    box.innerHTML = `<span class="muted">未开启</span>`;
+    html += `<span class="muted">作弊未开启</span><br>`;
   }
+  if (state.infinite_gold_mode) {
+    html += `<span class="tag ok">★ 无限金钱已开启</span> 金币自动补满`;
+  } else {
+    html += `<span class="muted">无限金钱未开启</span>`;
+  }
+  box.innerHTML = html;
+}
+
+function renderStorylines() {
+  const box = document.getElementById("storylines");
+  if (!box) return;
+  const list = state.storylines || [];
+  if (!list.length) {
+    box.innerHTML = `<span class="muted">暂无剧情线</span>`;
+    return;
+  }
+  const statusMap = {
+    AVAILABLE: '<span class="tag">可触发</span>',
+    ACTIVE: '<span class="tag war">进行中</span>',
+    COMPLETED: '<span class="tag ok">已完成</span>',
+    FAILED: '<span class="muted">失败</span>',
+  };
+  box.innerHTML = list.map(s => `
+    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+      <div><strong>${escapeHtml(s.title)}</strong> ${statusMap[s.status] || s.status}</div>
+      <div class="muted" style="font-size:12px;margin:2px 0">${escapeHtml(s.description)}</div>
+      ${s.stage_title ? `<div style="font-size:12px;color:#cfd6e4">阶段：<strong>${escapeHtml(s.stage_title)}</strong></div>` : ""}
+      ${s.stage_description ? `<div class="muted" style="font-size:12px">${escapeHtml(s.stage_description)}</div>` : ""}
+      ${s.tags && s.tags.length ? `<div style="margin-top:4px">${s.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join(" ")}</div>` : ""}
+    </div>
+  `).join("");
+}
+
+function renderTutorial() {
+  const t = state.tutorial;
+  if (!t) return;
+  const card = document.getElementById("tutorial-card");
+  const title = document.getElementById("tutorial-title");
+  const desc = document.getElementById("tutorial-desc");
+  const hint = document.getElementById("tutorial-hint");
+  if (!card || !title || !desc || !hint) return;
+  if (!t.enabled || t.completed) {
+    card.style.display = "none";
+    return;
+  }
+  card.style.display = "";
+  title.textContent = t.title || "";
+  desc.textContent = t.description || "";
+  hint.textContent = t.hint || "";
 }
 
 // ── 存档 ─────────────────────────────────
@@ -459,8 +591,30 @@ function renderSaves() {
 
 // ── 日志 ─────────────────────────────────
 function renderLists() {
-  document.getElementById("messages").innerHTML = (state.messages || []).slice().reverse().map((m) => `<div>${escapeHtml(m)}</div>`).join("");
-  document.getElementById("log").innerHTML = (state.log || []).slice().reverse().map((m) => `<div>${escapeHtml(m)}</div>`).join("");
+  const messagesBox = document.getElementById("messages");
+  const logBox = document.getElementById("log");
+  if (messagesBox) {
+    messagesBox.innerHTML = (state.messages || []).slice().reverse().map((m) => {
+      let color = "#cfd6e4";
+      if (m.includes("战争") || m.includes("宣战") || m.includes("白和")) color = "#e35d6a";
+      else if (m.includes("围城") || m.includes("占领")) color = "#e0a84a";
+      else if (m.includes("任命") || m.includes("内阁")) color = "#4ecdc4";
+      else if (m.includes("阴谋") || m.includes("暗杀")) color = "#a78bfa";
+      else if (m.includes("派系") || m.includes("通牒")) color = "#f59e0b";
+      return `<div style="color:${color}">${escapeHtml(m)}</div>`;
+    }).join("");
+  }
+  if (logBox) {
+    logBox.innerHTML = (state.log || []).slice().reverse().map((m) => {
+      let color = "#cfd6e4";
+      if (m.includes("战争") || m.includes("宣战") || m.includes("白和")) color = "#e35d6a";
+      else if (m.includes("围城") || m.includes("占领")) color = "#e0a84a";
+      else if (m.includes("任命") || m.includes("内阁")) color = "#4ecdc4";
+      else if (m.includes("阴谋") || m.includes("暗杀")) color = "#a78bfa";
+      else if (m.includes("派系") || m.includes("通牒")) color = "#f59e0b";
+      return `<div style="color:${color}">${escapeHtml(m)}</div>`;
+    }).join("");
+  }
 }
 
 // ── 工具 ─────────────────────────────────
@@ -558,6 +712,12 @@ function bind() {
     if (!selectedCounty) return alert("请先选择省份");
     act({ action: "fabricate_claim", county_id: selectedCounty });
   });
+  document.getElementById("btn-build").addEventListener("click", () => {
+    if (!selectedCounty) return alert("请先选择省份");
+    const kind = document.getElementById("building-type-select").value;
+    if (!kind) return alert("请选择建筑类型");
+    act({ action: "upgrade_building", county_id: selectedCounty, building_kind: kind });
+  });
   // 外交操作
   document.getElementById("btn-alliance").addEventListener("click", () => {
     const tid = Number(document.getElementById("dipl-char-select").value);
@@ -568,6 +728,22 @@ function bind() {
     const tid = Number(document.getElementById("dipl-char-select").value);
     if (!tid) return alert("请选择目标");
     act({ action: "form_non_aggression", target_id: tid });
+  });
+  document.getElementById("btn-vassalage").addEventListener("click", () => {
+    const tid = Number(document.getElementById("dipl-char-select").value);
+    if (!tid) return alert("请选择目标");
+    if (!confirm("确定要成为对方的附庸吗？这将限制你的外交自由。")) return;
+    act({ action: "form_vassalage", target_id: tid });
+  });
+  document.getElementById("btn-trade").addEventListener("click", () => {
+    const tid = Number(document.getElementById("dipl-char-select").value);
+    if (!tid) return alert("请选择目标");
+    act({ action: "form_trade_agreement", target_id: tid });
+  });
+  document.getElementById("btn-intel").addEventListener("click", () => {
+    const tid = Number(document.getElementById("dipl-char-select").value);
+    if (!tid) return alert("请选择目标");
+    act({ action: "form_intelligence_sharing", target_id: tid });
   });
   document.getElementById("btn-marry").addEventListener("click", () => {
     const tid = Number(document.getElementById("dipl-char-select").value);
@@ -585,6 +761,22 @@ function bind() {
     if (!tid) return alert("请选择目标");
     act({ action: "set_rival", target_id: tid });
   });
+  document.getElementById("btn-invite").addEventListener("click", () => {
+    const tid = Number(document.getElementById("dipl-char-select").value);
+    if (!tid) return alert("请选择目标");
+    act({ action: "invite_to_court", target_id: tid });
+  });
+  document.getElementById("btn-feast").addEventListener("click", () => {
+    const tid = Number(document.getElementById("dipl-char-select").value);
+    if (!tid) return alert("请选择目标");
+    act({ action: "host_feast_for", target_id: tid });
+  });
+  document.getElementById("btn-duel").addEventListener("click", () => {
+    const tid = Number(document.getElementById("dipl-char-select").value);
+    if (!tid) return alert("请选择目标");
+    if (!confirm("确定要与此人决斗吗？这可能会影响你们的关系。")) return;
+    act({ action: "duel", target_id: tid });
+  });
   // 阴谋操作
   document.getElementById("btn-start-scheme").addEventListener("click", () => {
     const tid = Number(document.getElementById("scheme-target-select").value);
@@ -599,6 +791,7 @@ function bind() {
   });
   // 作弊操作
   document.getElementById("btn-toggle-cheat").addEventListener("click", () => act({ action: "toggle_cheat" }));
+  document.getElementById("btn-toggle-infinite-gold").addEventListener("click", () => act({ action: "toggle_infinite_gold" }));
   document.getElementById("btn-cheat-gold").addEventListener("click", () => act({ action: "cheat_add_gold", amount: 1000 }));
   document.getElementById("btn-cheat-scheme").addEventListener("click", () => act({ action: "cheat_complete_scheme" }));
   document.getElementById("btn-load").addEventListener("click", () => {
@@ -613,6 +806,70 @@ function bind() {
   document.getElementById("btn-new").addEventListener("click", () => {
     if (confirm("开始新局？")) act({ action: "new_game" });
   });
+  document.getElementById("btn-tutorial-next").addEventListener("click", () => {
+    if (!state.tutorial) return;
+    act({ action: "tutorial_next" });
+  });
+  document.getElementById("btn-tutorial-skip").addEventListener("click", () => {
+    if (!confirm("确定要跳过教程吗？")) return;
+    act({ action: "tutorial_skip" });
+  });
+}
+
+// 教程自动推进
+function checkTutorialProgress(action) {
+  if (!state.tutorial || !state.tutorial.enabled || state.tutorial.completed) return;
+  const step = state.tutorial.current_step;
+  if (!step) return;
+  let shouldAdvance = false;
+  switch (step) {
+    case "SELECT_COUNTY":
+      if (action && action.action === "select_county") shouldAdvance = true;
+      break;
+    case "VIEW_CHARACTER":
+      if (action && action.action === "view_character") shouldAdvance = true;
+      break;
+    case "RAISE_ARMY":
+      if (action && action.action === "raise_army") shouldAdvance = true;
+      break;
+    case "MOVE_ARMY":
+      if (action && action.action === "move_army") shouldAdvance = true;
+      break;
+    case "DECLARE_WAR":
+      if (action && action.action === "declare_war") shouldAdvance = true;
+      break;
+    case "BUILD_BUILDING":
+      if (action && action.action === "upgrade_building") shouldAdvance = true;
+      break;
+    case "START_SCHEME":
+      if (action && action.action === "start_scheme") shouldAdvance = true;
+      break;
+    case "APPOINT_COUNCIL":
+      if (action && action.action === "appoint_council") shouldAdvance = true;
+      break;
+    case "SAVE_GAME":
+      if (action && action.action === "save_game") shouldAdvance = true;
+      break;
+    default:
+      break;
+  }
+  if (shouldAdvance) {
+    act({ action: "tutorial_next" });
+  }
+}
+
+// 教程步骤检测
+function detectTutorialAction() {
+  if (!state.tutorial || !state.tutorial.enabled || state.tutorial.completed) return;
+  const step = state.tutorial.current_step;
+  if (!step) return;
+  
+  // 检测玩家是否完成了当前教程步骤
+  if (step === "SELECT_COUNTY" && selectedCounty) {
+    act({ action: "tutorial_next" });
+  } else if (step === "VIEW_CHARACTER" && state.player) {
+    act({ action: "tutorial_next" });
+  }
 }
 
 // ── 启动 ─────────────────────────────────

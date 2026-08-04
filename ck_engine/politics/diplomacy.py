@@ -64,9 +64,12 @@ class RelationFlags:
     non_aggression: bool = False
     rival: bool = False
     marriage_pact: bool = False
+    vassalage: bool = False
+    trade_agreement: bool = False
+    intelligence_sharing: bool = False
 
     def blocks_war(self) -> bool:
-        return self.allied or self.non_aggression or self.marriage_pact
+        return self.allied or self.non_aggression or self.marriage_pact or self.vassalage
 
 
 class TreatyKind(Enum):
@@ -74,6 +77,9 @@ class TreatyKind(Enum):
     NON_AGGRESSION = auto()
     MARRIAGE_PACT = auto()
     TRUCE = auto()
+    VASSALAGE = auto()
+    TRADE_AGREEMENT = auto()
+    INTELLIGENCE_SHARING = auto()
 
     def name_zh(self) -> str:
         return {
@@ -81,6 +87,9 @@ class TreatyKind(Enum):
             TreatyKind.NON_AGGRESSION: "互不侵犯",
             TreatyKind.MARRIAGE_PACT: "联姻协定",
             TreatyKind.TRUCE: "停战",
+            TreatyKind.VASSALAGE: "附庸关系",
+            TreatyKind.TRADE_AGREEMENT: "贸易协定",
+            TreatyKind.INTELLIGENCE_SHARING: "情报共享",
         }[self]
 
 
@@ -129,6 +138,23 @@ class DiplomacySystem:
         f.non_aggression = True
         self.treaties.append(
             Treaty(a=a, b=b, kind=TreatyKind.ALLIANCE, start=date, expires_year=date.year + 50)
+        )
+
+    def form_vassalage(self, a: int, b: int, date: GameDate) -> None:
+        f = self.flags_mut(a, b)
+        f.non_aggression = True
+        self.treaties.append(
+            Treaty(a=a, b=b, kind=TreatyKind.VASSALAGE, start=date, expires_year=date.year + 100)
+        )
+
+    def form_trade_agreement(self, a: int, b: int, date: GameDate) -> None:
+        self.treaties.append(
+            Treaty(a=a, b=b, kind=TreatyKind.TRADE_AGREEMENT, start=date, expires_year=date.year + 30)
+        )
+
+    def form_intelligence_sharing(self, a: int, b: int, date: GameDate) -> None:
+        self.treaties.append(
+            Treaty(a=a, b=b, kind=TreatyKind.INTELLIGENCE_SHARING, start=date, expires_year=date.year + 20)
         )
 
     def set_at_war(self, a: int, b: int, at_war: bool) -> None:
@@ -221,6 +247,18 @@ class DiplomacySystem:
                     an = world.character(t.a).name if world and world.character(t.a) else str(t.a)
                     bn = world.character(t.b).name if world and world.character(t.b) else str(t.b)
                     logs.append(f"互不侵犯到期：{an} 与 {bn}")
+                elif t.kind == TreatyKind.VASSALAGE:
+                    an = world.character(t.a).name if world and world.character(t.a) else str(t.a)
+                    bn = world.character(t.b).name if world and world.character(t.b) else str(t.b)
+                    logs.append(f"附庸关系到期：{an} 与 {bn}")
+                elif t.kind == TreatyKind.TRADE_AGREEMENT:
+                    an = world.character(t.a).name if world and world.character(t.a) else str(t.a)
+                    bn = world.character(t.b).name if world and world.character(t.b) else str(t.b)
+                    logs.append(f"贸易协定到期：{an} 与 {bn}")
+                elif t.kind == TreatyKind.INTELLIGENCE_SHARING:
+                    an = world.character(t.a).name if world and world.character(t.a) else str(t.a)
+                    bn = world.character(t.b).name if world and world.character(t.b) else str(t.b)
+                    logs.append(f"情报共享到期：{an} 与 {bn}")
             else:
                 keep.append(t)
         self.treaties = keep

@@ -22,13 +22,14 @@ class FactionKind(Enum):
         }[self]
 
     def ultimatum_text(self) -> str:
-        return {
-            FactionKind.INDEPENDENCE: "要求独立",
-            FactionKind.LOWER_CROWN_AUTHORITY: "要求降低王权",
-            FactionKind.CLAIMANT: "要求更换君主",
-            FactionKind.LIBERTY: "要求恢复自由权利",
-            FactionKind.POPULAR: "要求改革苛政",
-        }[self]
+        texts = {
+            FactionKind.INDEPENDENCE: "要求独立，建立自己的政权",
+            FactionKind.LOWER_CROWN_AUTHORITY: "要求限制王权，扩大贵族议会权力",
+            FactionKind.CLAIMANT: "要求废黜当前君主，拥立新君",
+            FactionKind.LIBERTY: "要求恢复自由权利，减免赋税",
+            FactionKind.POPULAR: "要求改革苛政，减轻百姓负担",
+        }
+        return texts.get(self, "提出诉求")
 
 
 @dataclass

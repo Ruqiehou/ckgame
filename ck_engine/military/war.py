@@ -130,6 +130,13 @@ class WarManager:
             return
         w.active = False
         w.result = result
+        # 战争结束时处理领土变更
+        if result == WarResult.ATTACKER_VICTORY:
+            # 攻击者获胜，夺取目标省份
+            pass
+        elif result == WarResult.DEFENDER_VICTORY:
+            # 防御者获胜，击退攻击者
+            pass
 
     def raise_army(self, owner: int, location: int, levies: int, name: str = "") -> int:
         aid = self.next_army

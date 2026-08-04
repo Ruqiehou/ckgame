@@ -187,6 +187,21 @@ button.mini:hover { background: #35507a; }
 /* ── 指挥官选择 ── */
 #commander-select { flex: 1; }
 
+/* ── 建筑面板 ── */
+.building-item {
+  padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.building-item:last-child { border-bottom: none; }
+.building-item .upgrade-btn {
+  background: #2a4a3a; border-color: #3f5a34; color: #9ef0c7;
+}
+.building-item .upgrade-btn:hover:not(:disabled) {
+  background: #355a48; border-color: var(--ok); color: #fff;
+}
+.building-item .upgrade-btn:disabled {
+  opacity: 0.5; cursor: not-allowed;
+}
+
 /* ── 作弊面板 ── */
 .cheat-card {
   border-color: #5a3a1a;

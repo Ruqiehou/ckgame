@@ -7,6 +7,7 @@ from typing import Dict, List
 from ck_engine.ai import AiDirector, AiPersonality
 from ck_engine.core import NONE_ID, Season
 from ck_engine.events import EventEngine
+from ck_engine.events.storylines import StorylineSystem, builtin_storylines
 from ck_engine.game.scenario import Scenario1066
 from ck_engine.military import (
     ArmyStatus,
@@ -26,6 +27,7 @@ from ck_engine.politics import (
     SchemeSystem,
 )
 from ck_engine.world import TitleTier, World
+from ck_engine.world.buildings import BuildingSystem
 
 
 class GameSimulation:
@@ -38,6 +40,8 @@ class GameSimulation:
         self.schemes = SchemeSystem()
         self.diplomacy = DiplomacySystem()
         self.councils = CouncilRegistry()
+        self.buildings = BuildingSystem()
+        self.storylines = StorylineSystem()
         self.realm_laws: Dict[int, RealmLaw] = {}
         self.player_ids: set = set()
         self.bootstrap()
@@ -66,6 +70,8 @@ class GameSimulation:
         for r in list(self.world.rulers()):
             self.ensure_council(r.id)
             self.realm_laws.setdefault(r.id, RealmLaw.feudal_default())
+        for storyline in builtin_storylines():
+            self.storylines.create_storyline(storyline)
 
     def ensure_council(self, ruler: int) -> None:
         candidates = []
@@ -138,6 +144,10 @@ class GameSimulation:
         self.world.process_health()
         self.world.process_monthly_economy()
         self.world.process_fertility()
+
+        # 每月给予少量经验值
+        for c in self.world.alive_characters():
+            c.gain_xp(5)
 
         for rid in [r.id for r in self.world.rulers()]:
             law = self.realm_laws.get(rid)
@@ -313,6 +323,7 @@ class GameSimulation:
                 f = self.factions.factions.get(ev.faction_id)
                 if f:
                     f.discontent = min(100.0, f.discontent + 20)
+                    # 最后通牒已发出，等待玩家或AI决策
             elif ev.kind == "revolt":
                 liege = self.world.character(ev.liege)
                 fk = ev.faction_kind.name_zh() if ev.faction_kind else "叛乱"
@@ -456,7 +467,21 @@ class GameSimulation:
     def _retreat_army(self, army) -> None:
         """败军撤退：优先友方领地，其次中立，避开敌方。"""
         county = self.world.map.get(army.location)
-        if not county or not county.neighbors:
+        if not county:
+            army.status = ArmyStatus.RETREATING
+            return
+        if not county.neighbors:
+            # 孤立省份：尝试寻找任意可达省份
+            all_counties = list(self.world.map.all().keys())
+            random.shuffle(all_counties)
+            for cid in all_counties:
+                if cid == army.location:
+                    continue
+                path = self.world.map.path(army.location, cid)
+                if path:
+                    army.set_path(path)
+                    army.status = ArmyStatus.RETREATING
+                    return
             army.status = ArmyStatus.RETREATING
             return
         enemy_holders = set()
@@ -580,6 +605,8 @@ class GameSimulation:
                 self.world.push_log(
                     f"战争结束：{(an.name if an else '?')} 战胜 {(dn.name if dn else '?')}，强制执行和约"
                 )
+                # 领土变更：攻击者获得部分省份
+                self._transfer_territory(w.attacker_primary, w.defender_primary)
                 if an:
                     an.add_prestige(w.cb.attacker_prestige_on_win())
                     an.add_gold(30)
@@ -603,6 +630,8 @@ class GameSimulation:
                 self.world.push_log(
                     f"战争结束：{(dn.name if dn else '?')} 击退 {(an.name if an else '?')}"
                 )
+                # 防御者获胜，攻击者失去部分省份
+                self._transfer_territory(w.defender_primary, w.attacker_primary)
                 if dn:
                     dn.add_prestige(40)
                 if an:
@@ -625,6 +654,28 @@ class GameSimulation:
                         an.add_prestige(-5)
                     if dn:
                         dn.add_prestige(5)
+
+    def _transfer_territory(self, winner: int, loser: int) -> None:
+        """战争胜利后转移领土"""
+        loser_char = self.world.character(loser)
+        if not loser_char:
+            return
+        # 随机转移1-2个省份
+        counties_to_transfer = []
+        for tid in list(loser_char.held_titles):
+            t = self.world.title(tid)
+            if t and t.tier == TitleTier.COUNTY and t.counties:
+                counties_to_transfer.extend(list(t.counties))
+        
+        if counties_to_transfer:
+            random.shuffle(counties_to_transfer)
+            transfer_count = min(len(counties_to_transfer), random.randint(1, 2))
+            for i in range(transfer_count):
+                cid = counties_to_transfer[i]
+                self.world.occupy_county(cid, winner)
+                county = self.world.map.get(cid)
+                if county:
+                    self.world.push_log(f"领土变更：{county.name} 被转移")
 
     def transfer_one_county(self, frm: int, to: int) -> None:
         loser = self.world.character(frm)

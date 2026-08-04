@@ -39,6 +39,14 @@ class CouncilTask(Enum):
     SUPPORT_MURDER = auto()
     CONVERT_FAITH = auto()
     FABRICATE_HOOK = auto()
+    RECRUIT_KNIGHTS = auto()
+    IMPROVE_DIPLOMACY = auto()
+    SPREAD_CULTURE = auto()
+    ESTABLISH_TRADE = auto()
+    MAINTAIN_BUILDINGS = auto()
+    TRAIN_TROOPS = auto()
+    GATHER_INTEL = auto()
+    PROMOTE_CULTURE = auto()
 
     def name_zh(self) -> str:
         return {
@@ -52,6 +60,14 @@ class CouncilTask(Enum):
             CouncilTask.SUPPORT_MURDER: "协助密谋",
             CouncilTask.CONVERT_FAITH: "传播信仰",
             CouncilTask.FABRICATE_HOOK: "神权施压",
+            CouncilTask.RECRUIT_KNIGHTS: "招募骑士",
+            CouncilTask.IMPROVE_DIPLOMACY: "改善外交",
+            CouncilTask.SPREAD_CULTURE: "传播文化",
+            CouncilTask.ESTABLISH_TRADE: "建立商路",
+            CouncilTask.MAINTAIN_BUILDINGS: "维护建筑",
+            CouncilTask.TRAIN_TROOPS: "训练部队",
+            CouncilTask.GATHER_INTEL: "收集情报",
+            CouncilTask.PROMOTE_CULTURE: "推广文化",
         }[self]
 
 
@@ -170,6 +186,37 @@ class Council:
             elif task == CouncilTask.FABRICATE_HOOK:
                 r.piety += skills[4] * 0.2
                 r.claim_progress += skills[4] * 0.25
+            elif task == CouncilTask.RECRUIT_KNIGHTS:
+                r.gold -= 15
+                r.prestige += 5
+                r.logs.append("骑士招募中")
+            elif task == CouncilTask.IMPROVE_DIPLOMACY:
+                r.prestige += skills[0] * 0.4
+                r.logs.append("外交关系改善")
+            elif task == CouncilTask.SPREAD_CULTURE:
+                r.control_gain += skills[4] * 0.3
+                r.piety += skills[4] * 0.2
+                r.logs.append("文化传播中")
+            elif task == CouncilTask.ESTABLISH_TRADE:
+                r.gold += skills[0] * 0.5
+                r.prestige += skills[2] * 0.2
+                r.logs.append("商路建立中")
+            elif task == CouncilTask.MAINTAIN_BUILDINGS:
+                r.gold -= 5
+                r.control_gain += skills[2] * 0.2
+                r.logs.append("建筑维护中")
+            elif task == CouncilTask.TRAIN_TROOPS:
+                r.gold -= 10
+                r.control_gain += skills[1] * 0.3
+                r.logs.append("部队训练中")
+            elif task == CouncilTask.GATHER_INTEL:
+                r.prestige += skills[3] * 0.3
+                r.claim_progress += skills[3] * 0.2
+                r.logs.append("情报收集中")
+            elif task == CouncilTask.PROMOTE_CULTURE:
+                r.control_gain += skills[4] * 0.4
+                r.piety += skills[4] * 0.1
+                r.logs.append("文化推广中")
             else:
                 # 职位默认产出，避免空任务白占席位
                 if pos == CouncilPosition.CHANCELLOR:

@@ -45,6 +45,8 @@ class Character:
     is_ruler: bool = False
     employer: int = NONE_ID
     opinion_cache: Dict[int, int] = field(default_factory=dict)
+    level: int = 1
+    xp: int = 0
 
     def age_at(self, date: GameDate) -> int:
         age = date.year - self.birth.year
@@ -79,3 +81,17 @@ class Character:
 
     def add_stress(self, amount: int) -> None:
         self.stress = max(0, min(400, self.stress + amount))
+
+    def gain_xp(self, amount: int) -> bool:
+        """获得经验值，返回是否升级。"""
+        self.xp += amount
+        leveled = False
+        while self.xp >= self.xp_to_next_level():
+            self.xp -= self.xp_to_next_level()
+            self.level += 1
+            leveled = True
+        return leveled
+
+    def xp_to_next_level(self) -> int:
+        """升级所需经验值，随等级递增。"""
+        return 100 + (self.level - 1) * 50

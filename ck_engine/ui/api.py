@@ -28,6 +28,8 @@ from ck_engine.core.balance import (
     SUPPLY_MOVE_SLOW_THRESHOLD,
 )
 from ck_engine.ui.map_layout import layout_for, points_to_svg, sea_band, viewbox
+from ck_engine.ui.tutorial import TutorialSystem, TutorialStep
+from ck_engine.world.buildings import BuildingKind
 
 
 class GameAPI:
@@ -45,6 +47,8 @@ class GameAPI:
         self.save_path = Path(__file__).resolve().parents[2] / "saves" / "autosave.json"
         self._lock = threading.Lock()
         self.cheat_mode = False
+        self.infinite_gold_mode = False
+        self.tutorial = TutorialSystem()
 
     def _default_player(self) -> int:
         for c in self.sim.world.alive_characters():
@@ -108,6 +112,7 @@ class GameAPI:
                         else None
                     ),
                     "is_player": bool(holder and holder.id == self.player_id),
+                    "buildings": self._county_buildings(county.id),
                 }
             )
 
@@ -240,6 +245,9 @@ class GameAPI:
                 "income": round(w.monthly_income_of(player.id), 1),
                 "men": self.sim.wars.total_men_of(player.id),
                 "laws": self._player_laws(),
+                "level": player.level,
+                "xp": player.xp,
+                "xp_to_next": player.xp_to_next_level(),
             }
 
         playable = [
@@ -286,6 +294,7 @@ class GameAPI:
             "supply_low_threshold": SUPPLY_LOW_THRESHOLD,
             "saves": self._list_saves(),
             "cheat_mode": self.cheat_mode,
+            "infinite_gold_mode": self.infinite_gold_mode,
             "pending_events": [
                 {
                     "event_id": inst.event_id,
@@ -310,6 +319,8 @@ class GameAPI:
             ]],
             "council_positions": [(p.name, p.name_zh()) for p in CouncilPosition.all()],
             "council_tasks": [(t.name, t.name_zh()) for t in CouncilTask],
+            "storylines": self._player_storylines(),
+            "tutorial": self._tutorial_snapshot(),
         }
 
     def _holder_color(self, holder_id: int) -> str:
@@ -326,6 +337,20 @@ class GameAPI:
         # 按 id 生成稳定色
         hue = (holder_id * 47) % 360
         return f"hsl({hue} 55% 42%)"
+
+    def _county_buildings(self, county_id: int) -> List[Dict]:
+        buildings = []
+        for b in self.sim.buildings.get_buildings(county_id):
+            buildings.append({
+                "kind": b.kind.name,
+                "name": b.kind.name_zh(),
+                "level": b.level,
+                "max_level": b.kind.max_level(),
+                "can_upgrade": b.can_upgrade(),
+                "upgrade_cost": b.upgrade_cost(),
+                "description": b.kind.description(),
+            })
+        return buildings
 
     # ---------- snapshot 辅助 ----------
     def _player_schemes(self) -> List[Dict[str, Any]]:
@@ -364,6 +389,45 @@ class GameAPI:
                 "task_zh": task.name_zh(),
             })
         return {"members": members}
+
+    def _player_storylines(self) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        for s in self.sim.storylines.storylines:
+            if s.character_id == 0 or s.character_id == self.player_id:
+                out.append({
+                    "id": s.id,
+                    "title": s.title,
+                    "description": s.description,
+                    "status": s.status.name,
+                    "current_stage": s.current_stage,
+                    "stage_title": next((st.title for st in s.stages if st.stage_id == s.current_stage), ""),
+                    "stage_description": next((st.description for st in s.stages if st.stage_id == s.current_stage), ""),
+                    "tags": s.tags,
+                })
+        return out
+
+    def _tutorial_snapshot(self) -> Dict[str, Any]:
+        step = self.tutorial.get_current_step()
+        return {
+            "enabled": self.tutorial.enabled,
+            "current_step": self.tutorial.current_step.name,
+            "current_step_zh": self.tutorial.current_step.name_zh(),
+            "title": step.title if step else "",
+            "description": step.description if step else "",
+            "hint": step.hint if step else "",
+            "action_hint": step.action_hint if step else "",
+            "completed": self.tutorial.is_completed(),
+            "completed_steps": [s.name for s in self.tutorial.completed_steps],
+        }
+
+    def _tutorial_next(self) -> None:
+        current = self.tutorial.current_step
+        self.tutorial.advance(current)
+        step = self.tutorial.get_current_step()
+        if step:
+            self.notify(f"教程：{step.title} - {step.description}")
+        else:
+            self.notify("教程已完成！")
 
     def _player_claims(self) -> List[Dict[str, Any]]:
         out = []
@@ -446,7 +510,13 @@ class GameAPI:
                 "relation_rival": self.sim.diplomacy.flags(self.player_id, c.id).rival,
                 "relation_at_war": self.sim.diplomacy.flags(self.player_id, c.id).at_war,
                 "relation_marriage": self.sim.diplomacy.flags(self.player_id, c.id).marriage_pact,
+                "relation_vassalage": self.sim.diplomacy.flags(self.player_id, c.id).vassalage,
+                "relation_trade_agreement": self.sim.diplomacy.flags(self.player_id, c.id).trade_agreement,
+                "relation_intelligence_sharing": self.sim.diplomacy.flags(self.player_id, c.id).intelligence_sharing,
                 "held_title_ids": list(c.held_titles),
+                "level": c.level,
+                "xp": c.xp,
+                "xp_to_next": c.xp_to_next_level(),
             })
         return out
 
@@ -460,8 +530,10 @@ class GameAPI:
         try:
             if kind == "select_county":
                 self.selected_county = int(payload["county_id"])
+                self.selected_army = None
             elif kind == "select_army":
                 self.selected_army = int(payload["army_id"])
+                self.selected_county = None
             elif kind == "set_player":
                 self.player_id = int(payload["character_id"])
                 self._sync_player()
@@ -524,6 +596,12 @@ class GameAPI:
                 self._form_alliance(int(payload["target_id"]))
             elif kind == "form_non_aggression":
                 self._form_non_aggression(int(payload["target_id"]))
+            elif kind == "form_vassalage":
+                self._form_vassalage(int(payload["target_id"]))
+            elif kind == "form_trade_agreement":
+                self._form_trade_agreement(int(payload["target_id"]))
+            elif kind == "form_intelligence_sharing":
+                self._form_intelligence_sharing(int(payload["target_id"]))
             elif kind == "arrange_marriage":
                 self._arrange_marriage(int(payload["target_id"]))
             elif kind == "send_gift":
@@ -544,6 +622,8 @@ class GameAPI:
                 self._set_commander(int(payload["army_id"]), int(payload["character_id"]))
             elif kind == "fabricate_claim":
                 self._fabricate_claim(int(payload["county_id"]))
+            elif kind == "upgrade_building":
+                self._upgrade_building(int(payload["county_id"]), payload.get("building_kind"))
             elif kind == "toggle_cheat":
                 self.cheat_mode = not self.cheat_mode
                 if self.cheat_mode:
@@ -551,6 +631,18 @@ class GameAPI:
                     self.notify("★ 作弊模式已开启：无限金钱/威望/虔诚")
                 else:
                     self.notify("作弊模式已关闭")
+            elif kind == "toggle_infinite_gold":
+                self.infinite_gold_mode = not self.infinite_gold_mode
+                if self.infinite_gold_mode:
+                    self._apply_infinite_gold()
+                    self.notify("★ 无限金钱模式已开启")
+                else:
+                    self.notify("无限金钱模式已关闭")
+            elif kind == "tutorial_next":
+                self._tutorial_next()
+            elif kind == "tutorial_skip":
+                self.tutorial.enabled = False
+                self.notify("教程已跳过")
             elif kind == "cheat_add_gold":
                 amount = float(payload.get("amount", 1000))
                 player = self.sim.world.character(self.player_id)
@@ -564,6 +656,7 @@ class GameAPI:
         except Exception as e:  # noqa: BLE001 — 返回给前端
             self.notify(f"操作失败: {e}")
         self._apply_cheat()
+        self._apply_infinite_gold()
         return self._snapshot_unlocked()
 
     def _name(self, cid: int) -> str:
@@ -581,6 +674,24 @@ class GameAPI:
         player.prestige = self.CHEAT_PRESTIGE
         player.piety = self.CHEAT_PIETY
         player.stress = 0
+
+    def _apply_infinite_gold(self) -> None:
+        """无限金钱模式开启时，每次操作后补满金币。"""
+        if not self.infinite_gold_mode:
+            return
+        player = self.sim.world.character(self.player_id)
+        if not player:
+            return
+        player.gold = self.CHEAT_GOLD
+
+    def _grant_action_xp(self, amount: int) -> None:
+        """给玩家角色增加经验值。"""
+        player = self.sim.world.character(self.player_id)
+        if not player:
+            return
+        leveled = player.gain_xp(amount)
+        if leveled:
+            self.notify(f"🎉 角色升级！当前等级：{player.level}")
 
     def _cheat_complete_scheme(self) -> None:
         """作弊：立即完成所有玩家的进行中阴谋。"""
@@ -718,6 +829,45 @@ class GameAPI:
         self.sim.world.push_log(f"{self._name(self.player_id)} 与 {target.name} 签订互不侵犯条约")
         self.notify(f"已与 {target.name} 签订互不侵犯条约")
 
+    def _form_vassalage(self, target_id: int) -> None:
+        if target_id == self.player_id:
+            raise ValueError("无效目标")
+        dip = self.sim.diplomacy
+        if dip.flags(self.player_id, target_id).vassalage:
+            raise ValueError("已是附庸关系")
+        target = self.sim.world.character(target_id)
+        if not target:
+            raise ValueError("目标无效")
+        dip.form_vassalage(self.player_id, target_id, self.sim.world.date)
+        self.sim.world.push_log(f"{self._name(self.player_id)} 成为 {target.name} 的附庸")
+        self.notify(f"已成为 {target.name} 的附庸")
+
+    def _form_trade_agreement(self, target_id: int) -> None:
+        if target_id == self.player_id:
+            raise ValueError("无效目标")
+        dip = self.sim.diplomacy
+        if dip.flags(self.player_id, target_id).trade_agreement:
+            raise ValueError("已有贸易协定")
+        target = self.sim.world.character(target_id)
+        if not target:
+            raise ValueError("目标无效")
+        dip.form_trade_agreement(self.player_id, target_id, self.sim.world.date)
+        self.sim.world.push_log(f"{self._name(self.player_id)} 与 {target.name} 签订贸易协定")
+        self.notify(f"已与 {target.name} 签订贸易协定")
+
+    def _form_intelligence_sharing(self, target_id: int) -> None:
+        if target_id == self.player_id:
+            raise ValueError("无效目标")
+        dip = self.sim.diplomacy
+        if dip.flags(self.player_id, target_id).intelligence_sharing:
+            raise ValueError("已有情报共享")
+        target = self.sim.world.character(target_id)
+        if not target:
+            raise ValueError("目标无效")
+        dip.form_intelligence_sharing(self.player_id, target_id, self.sim.world.date)
+        self.sim.world.push_log(f"{self._name(self.player_id)} 与 {target.name} 建立情报共享")
+        self.notify(f"已与 {target.name} 建立情报共享")
+
     def _make_treaty(self, target_id: int, kind: TreatyKind, years: int):
         from ck_engine.politics.diplomacy import Treaty
         return Treaty(
@@ -786,6 +936,76 @@ class GameAPI:
         self.sim.world.push_log(f"{self._name(self.player_id)} 视 {target.name} 为宿敌")
         self.notify(f"已将 {target.name} 设为宿敌")
 
+    def _invite_to_court(self, target_id: int) -> None:
+        if target_id == self.player_id:
+            raise ValueError("不能邀请自己")
+        target = self.sim.world.character(target_id)
+        if not target or not target.is_alive():
+            raise ValueError("目标无效")
+        if not target.is_adult(self.sim.world.date):
+            raise ValueError("目标未成年")
+        player = self.sim.world.character(self.player_id)
+        if not player:
+            raise ValueError("玩家无效")
+        if player.gold < 30:
+            raise ValueError("金币不足（需要 30）")
+        player.add_gold(-30)
+        self.sim.world.modify_opinion(target_id, self.player_id, 15)
+        self.sim.world.push_log(f"{player.name} 邀请 {target.name} 访问宫廷")
+        self.notify(f"已邀请 {target.name} 访问宫廷（花费 30 金）")
+
+    def _host_feast_for(self, target_id: int) -> None:
+        if target_id == self.player_id:
+            raise ValueError("不能宴请自己")
+        target = self.sim.world.character(target_id)
+        if not target or not target.is_alive():
+            raise ValueError("目标无效")
+        player = self.sim.world.character(self.player_id)
+        if not player:
+            raise ValueError("玩家无效")
+        if player.gold < 40:
+            raise ValueError("金币不足（需要 40）")
+        player.add_gold(-40)
+        gain = 20
+        self.sim.world.modify_opinion(target_id, self.player_id, gain)
+        player.add_prestige(10)
+        player.add_stress(-8)
+        self.sim.world.push_log(f"{player.name} 为 {target.name} 举办宴会")
+        self.notify(f"已为 {target.name} 举办宴会（好感 +{gain}，威望 +10）")
+
+    def _duel(self, target_id: int) -> None:
+        if target_id == self.player_id:
+            raise ValueError("不能与自己决斗")
+        target = self.sim.world.character(target_id)
+        if not target or not target.is_alive():
+            raise ValueError("目标无效")
+        if not target.is_adult(self.sim.world.date):
+            raise ValueError("目标未成年")
+        player = self.sim.world.character(self.player_id)
+        if not player:
+            raise ValueError("玩家无效")
+        attrs = self.sim.world.effective_attrs(self.player_id)
+        target_attrs = self.sim.world.effective_attrs(target_id)
+        player_score = (attrs.prowess if attrs else 0) + random.uniform(0, 20)
+        target_score = (target_attrs.prowess if target_attrs else 0) + random.uniform(0, 20)
+        if player_score > target_score:
+            self.sim.world.modify_opinion(target_id, self.player_id, -10)
+            self.sim.world.modify_opinion(self.player_id, target_id, -15)
+            player.add_prestige(15)
+            target.add_stress(10)
+            self.sim.world.push_log(f"{player.name} 在决斗中击败了 {target.name}")
+            self.notify(f"决斗胜利！威望 +15")
+        elif player_score < target_score:
+            self.sim.world.modify_opinion(target_id, self.player_id, 5)
+            self.sim.world.modify_opinion(self.player_id, target_id, -20)
+            player.add_stress(15)
+            player.health -= 0.1
+            self.sim.world.push_log(f"{player.name} 在决斗中被 {target.name} 击败")
+            self.notify(f"决斗失败，受伤了")
+        else:
+            self.sim.world.push_log(f"{player.name} 与 {target.name} 的决斗不分胜负")
+            self.notify("决斗平局")
+
     def _fabricate_claim(self, county_id: int) -> None:
         county = self.sim.world.map.get(county_id)
         if not county:
@@ -805,6 +1025,46 @@ class GameAPI:
             self.sim.diplomacy.add_claim(self.player_id, title_id, county_id, 60)
         self.sim.world.push_log(f"{player.name} 伪造了对 {county.name} 的宣称")
         self.notify(f"已伪造对 {county.name} 的宣称（花费 50 金）")
+        self._grant_action_xp(40)
+
+    def _upgrade_building(self, county_id: int, building_kind_name: Any) -> None:
+        county = self.sim.world.map.get(county_id)
+        if not county:
+            raise ValueError("省份不存在")
+        if county.holder != self.player_id:
+            raise ValueError("不是己方领地")
+        if not building_kind_name:
+            raise ValueError("缺少建筑类型")
+        try:
+            kind = BuildingKind[building_kind_name]
+        except KeyError:
+            raise ValueError(f"未知建筑类型: {building_kind_name}")
+        player = self.sim.world.character(self.player_id)
+        if not player:
+            raise ValueError("玩家无效")
+        b = self.sim.buildings.get_building(county_id, kind)
+        if not b:
+            # 新建建筑
+            cost = kind.upgrade_cost(0)
+            if player.gold < cost:
+                raise ValueError(f"金币不足（需要 {cost}）")
+            player.add_gold(-cost)
+            self.sim.buildings.add_building(county_id, kind)
+            self.sim.world.push_log(f"{player.name} 在 {county.name} 建造了 {kind.name_zh()}")
+            self.notify(f"建造 {kind.name_zh()}（花费 {cost} 金）")
+            self._grant_action_xp(20)
+        else:
+            # 升级建筑
+            if not b.can_upgrade():
+                raise ValueError(f"{kind.name_zh()} 已达最高级")
+            cost = b.upgrade_cost()
+            if player.gold < cost:
+                raise ValueError(f"金币不足（需要 {cost}）")
+            player.add_gold(-cost)
+            b.level += 1
+            self.sim.world.push_log(f"{player.name} 将 {county.name} 的 {kind.name_zh()} 升级到 {b.level} 级")
+            self.notify(f"{kind.name_zh()} 升级到 {b.level} 级（花费 {cost} 金）")
+            self._grant_action_xp(20)
 
     # ---------- 内阁 ----------
     def _appoint_council(self, position_name: Any, character_id: int) -> None:
@@ -1004,6 +1264,7 @@ class GameAPI:
         dip.add_war_exhaustion(self.player_id)
         dip.add_war_exhaustion(target_id)
         self.notify(f"已对 {target.name} 宣战")
+        self._grant_action_xp(50)
 
     def _improve(self, target_id: int) -> None:
         player = self.sim.world.character(self.player_id)
@@ -1013,6 +1274,7 @@ class GameAPI:
         self.sim.world.modify_opinion(target_id, self.player_id, 15)
         self.sim.world.modify_opinion(self.player_id, target_id, 5)
         self.notify(f"改善与 {self._name(target_id)} 的关系")
+        self._grant_action_xp(20)
 
     def _feast(self) -> None:
         player = self.sim.world.character(self.player_id)
@@ -1090,6 +1352,7 @@ class GameAPI:
         self.sim.events.resolve_choice(self.sim.world, inst, choice_id)
         self.sim.events.pending = [e for e in self.sim.events.pending if e is not inst]
         self.notify(f"已选择事件选项：{inst.title}")
+        self._grant_action_xp(30)
 
     def _save_file(self, name: Any = None) -> Path:
         if name is None or str(name).strip() == "":
@@ -1163,7 +1426,13 @@ class GameAPI:
                 for c in w.characters.values()
             },
             "counties": {
-                str(c.id): {"holder": c.holder, "control": c.control, "development": c.development}
+                str(c.id): {
+                    "holder": c.holder, "control": c.control, "development": c.development,
+                    "buildings": [
+                        {"kind": b.kind.name, "level": b.level}
+                        for b in self.sim.buildings.get_buildings(c.id)
+                    ],
+                }
                 for c in w.map.iter()
             },
             "titles": {
@@ -1299,6 +1568,13 @@ class GameAPI:
                 county.holder = row["holder"]
                 county.control = row.get("control", county.control)
                 county.development = row.get("development", county.development)
+                for b_row in row.get("buildings", []):
+                    try:
+                        kind = BuildingKind[b_row["kind"]]
+                        b = self.sim.buildings.add_building(county.id, kind)
+                        b.level = b_row.get("level", 0)
+                    except KeyError:
+                        continue
 
         # 恢复战争
         sim.wars.wars.clear()
