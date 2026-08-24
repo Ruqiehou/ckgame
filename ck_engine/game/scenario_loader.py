@@ -35,6 +35,10 @@ def load_scenario(path: Path | str | None = None) -> World:
     data: Dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     start = data.get("start_date", [1066, 1, 1])
     world = World(_date(start))
+    
+    # 加载贸易路线数据
+    if "trade_routes" in data:
+        world.load_trade_routes(data["trade_routes"])
 
     dyn: Dict[str, int] = {}
     for row in data.get("dynasties", []):

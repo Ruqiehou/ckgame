@@ -325,6 +325,9 @@ class GameAPI:
             "council_tasks": [(t.name, t.name_zh()) for t in CouncilTask],
             "storylines": self._player_storylines(),
             "tutorial": self._tutorial_snapshot(),
+            "trade_routes": w.trade_routes,
+            "exchange_rates": w.exchange_rates,
+            "trade_events": w.trade_events,
         }
 
     def _holder_color(self, holder_id: int) -> str:

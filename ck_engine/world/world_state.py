@@ -24,6 +24,9 @@ class World:
         self.next_dynasty = 1
         self.next_title = 1
         self.next_county = 1
+        self.trade_routes: List[Dict] = []  # 贸易路线数据
+        self.exchange_rates: Dict[Tuple[str, str], float] = {}  # 汇率缓存
+        self.trade_events: List[Dict] = []  # 贸易事件记录
 
     def push_log(self, msg: str) -> None:
         line = f"[{self.date}] {msg}"
@@ -359,6 +362,38 @@ class World:
             self.clear_vassal_link(tid)
         return True
 
+    # ---------- 贸易系统 ----------
+    def load_trade_routes(self, routes: List[Dict]) -> None:
+        """从场景数据加载贸易路线"""
+        self.trade_routes = routes
+        for route in routes:
+            key = (route["from"], route["to"])
+            self.exchange_rates[key] = route["exchange_rate"]
+
+    def calculate_trade_income(self, ruler: int) -> float:
+        """计算贸易路线带来的收入"""
+        c = self.character(ruler)
+        if not c:
+            return 0.0
+        income = 0.0
+        for tid in c.held_titles:
+            t = self.title(tid)
+            if not t:
+                continue
+            for cid in t.counties:
+                county = self.map.get(cid)
+                if not county:
+                    continue
+                
+                # 检查该省份是否在贸易路线上
+                for route in self.trade_routes:
+                    if route["from"] == county.key or route["to"] == county.key:
+                        # 根据贸易量和汇率计算收入
+                        trade_volume = route["trade_volume"]
+                        exchange_rate = self.exchange_rates.get((route["from"], route["to"]), 1.0)
+                        income += trade_volume * exchange_rate * 0.1  # 10%作为税收
+        return income
+
     # ---------- 经济 ----------
     def monthly_income_of(self, ruler: int) -> float:
         c = self.character(ruler)
@@ -373,6 +408,8 @@ class World:
                 county = self.map.get(cid)
                 if county:
                     income += county.monthly_tax()
+        # 添加贸易收入
+        income += self.calculate_trade_income(ruler)
         attrs = self.effective_attrs(ruler)
         if attrs:
             income *= 1.0 + (attrs.stewardship - 8) * 0.03
@@ -385,6 +422,14 @@ class World:
         net_income: Dict[int, float] = {}
         for c in list(self.alive_characters()):
             income = self.monthly_income_of(c.id)
+            
+            # 检查贸易事件影响
+            for route in self.trade_routes:
+                if route["from"] == c.primary_title or route["to"] == c.primary_title:
+                    event_chance = random.random()
+                    if event_chance < 0.05:  # 5%概率发生贸易事件
+                        self.trigger_trade_event(route)
+            
             for tid in c.held_titles:
                 t = self.title(tid)
                 if not t:
@@ -411,6 +456,58 @@ class World:
             c.add_gold(income)
             if income > 0:
                 c.add_prestige(1.0)
+        
+        # 每月更新汇率（波动）
+        self.update_exchange_rates()
+
+    def trigger_trade_event(self, route: Dict) -> None:
+        """触发贸易事件"""
+        event_type = random.choice(["blockade", "boom", "crisis", "new_route"])
+        event_desc = ""
+        
+        if event_type == "blockade":
+            event_desc = f"贸易路线 {route['from']} → {route['to']} 被封锁，收入减少"
+            # 降低汇率
+            key = (route["from"], route["to"])
+            if key in self.exchange_rates:
+                self.exchange_rates[key] *= 0.8
+        elif event_type == "boom":
+            event_desc = f"贸易路线 {route['from']} → {route['to']} 繁荣，收入增加"
+            # 提高汇率
+            key = (route["from"], route["to"])
+            if key in self.exchange_rates:
+                self.exchange_rates[key] *= 1.2
+        elif event_type == "crisis":
+            event_desc = f"贸易路线 {route['from']} → {route['to']} 遭遇危机，收入大幅减少"
+            # 大幅降低汇率
+            key = (route["from"], route["to"])
+            if key in self.exchange_rates:
+                self.exchange_rates[key] *= 0.6
+        elif event_type == "new_route":
+            event_desc = f"新的贸易路线 {route['from']} → {route['to']} 建立，收入增加"
+            # 提高汇率
+            key = (route["from"], route["to"])
+            if key in self.exchange_rates:
+                self.exchange_rates[key] *= 1.1
+        
+        self.push_log(event_desc)
+        self.trade_events.append({
+            "date": self.date.to_string(),
+            "route": route,
+            "type": event_type,
+            "description": event_desc
+        })
+
+    def update_exchange_rates(self) -> None:
+        """每月更新汇率（随机波动）"""
+        for route in self.trade_routes:
+            key = (route["from"], route["to"])
+            if key in self.exchange_rates:
+                # 随机波动 ±10%
+                fluctuation = random.uniform(0.9, 1.1)
+                self.exchange_rates[key] *= fluctuation
+                # 限制汇率范围
+                self.exchange_rates[key] = max(0.5, min(2.0, self.exchange_rates[key]))
 
         for county in self.map.counties.values():
             if county.control > 80 and county.development < county.terrain.development_cap():

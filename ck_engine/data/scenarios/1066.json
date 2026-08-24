@@ -34,7 +34,14 @@
     ["east_anglia", "lincoln"], ["kent", "sussex"],
     ["normandy", "rouen"], ["normandy", "caen"],
     ["rouen", "bayeux"], ["caen", "bayeux"],
-    ["normandy", "kent"], ["caen", "sussex"]
+    ["normandy", "kent"], ["caen", "sussex"
+  ],
+  "trade_routes": [
+    {"from": "middlesex", "to": "wessex", "trade_volume": 150, "exchange_rate": 1.2},
+    {"from": "normandy", "to": "rouen", "trade_volume": 200, "exchange_rate": 1.3},
+    {"from": "caen", "to": "bayeux", "trade_volume": 180, "exchange_rate": 1.1},
+    {"from": "lincoln", "to": "york", "trade_volume": 120, "exchange_rate": 1.1},
+    {"from": "east_anglia", "to": "middlesex", "trade_volume": 100, "exchange_rate": 1.0}
   ],
   "titles": [
     {"key": "k_england", "name": "英格兰", "tier": "KINGDOM"},
