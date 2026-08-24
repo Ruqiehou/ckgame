@@ -12,11 +12,13 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from ck_engine.politics.laws import CrownAuthority, GenderLaw, SuccessionLaw
 from ck_engine.ui.api import GameAPI
+from ck_engine.world.buildings import BuildingKind
 
 
 def clear() -> None:
@@ -118,6 +120,34 @@ class GameTUI:
                 self._action_improve()
             elif cmd == "feast":
                 self._action_feast()
+            elif cmd == "build":
+                self._menu_build()
+            elif cmd == "laws":
+                self._menu_laws()
+            elif cmd == "peace":
+                self._action_peace()
+            elif cmd == "factions":
+                self._menu_factions()
+            elif cmd == "grant":
+                self._action_grant()
+            elif cmd == "claim":
+                self._action_claim()
+            elif cmd == "develop":
+                self._action_develop()
+            elif cmd == "knights":
+                self._action_knights()
+            elif cmd == "commander":
+                self._action_commander()
+            elif cmd == "claims":
+                self._show_claims()
+            elif cmd == "treaties":
+                self._show_treaties()
+            elif cmd == "rulers":
+                self._show_rulers()
+            elif cmd == "new":
+                self._action_new_game()
+            elif cmd == "player":
+                self._action_switch_player()
             elif cmd == "advance":
                 self._action_advance()
             elif cmd == "save":
@@ -135,25 +165,22 @@ class GameTUI:
     # ---------- 主菜单 ----------
     def _show_main_menu(self) -> None:
         print("\n—— 主菜单 ——")
-        print("  status    查看角色状态")
-        print("  counties  查看领地列表")
-        print("  armies    查看军团")
-        print("  wars      查看战争")
-        print("  raise     征召军团")
-        print("  move      移动军团")
-        print("  disband   解散军团")
-        print("  war       宣战")
-        print("  improve   改善关系")
-        print("  feast     举办宴会")
-        print("  council   内阁管理")
-        print("  schemes   阴谋活动")
-        print("  diplomacy 外交行动")
-        print("  advance   推进时间")
-        print("  save      存档")
-        print("  load      读档")
-        print("  cheat     作弊模式")
-        print("  help      帮助")
-        print("  exit      退出")
+        print("  status    查看角色状态      rulers    查看各国君主")
+        print("  counties  查看领地列表      claims    查看我的宣称")
+        print("  armies    查看军团          treaties  查看条约/停战")
+        print("  wars      查看战争          factions  派系管理")
+        print("  raise     征召军团          build     建造/升级建筑")
+        print("  move      移动军团          develop   发展领地")
+        print("  disband   解散军团          laws      更改法律")
+        print("  war       宣战              claim     伪造宣称")
+        print("  peace     求和/白和         grant     授予头衔")
+        print("  improve   改善关系          knights   招募精锐")
+        print("  feast     举办宴会          commander 任命指挥官")
+        print("  council   内阁管理          player    切换玩家")
+        print("  schemes   阴谋活动          new       新游戏")
+        print("  diplomacy 外交行动          advance   推进时间")
+        print("  save      存档    load      读档    cheat     作弊模式")
+        print("  help      帮助    exit      退出")
 
     def _show_help(self) -> None:
         clear()
@@ -457,6 +484,398 @@ class GameTUI:
         print(f"\n  {msg or '宴会完成'}")
         pause()
 
+    # ---------- 建筑 ----------
+    def _menu_build(self) -> None:
+        self.render("建造/升级建筑")
+        snap = self.api.snapshot()
+        owned = [c for c in snap.get("counties", []) if c.get("is_player")]
+        if not owned:
+            print("\n  你没有领地，无法建造")
+            pause()
+            return
+
+        print("\n  选择省份：")
+        for i, c in enumerate(owned, 1):
+            print(f"    {i}. {c['name']} (发展:{c['development']} 已有建筑:{len(c.get('buildings', []))})")
+        print(f"    0. 返回")
+
+        try:
+            choice = int(input("\n选择 > ").strip())
+        except ValueError:
+            return
+        if choice == 0 or not (1 <= choice <= len(owned)):
+            return
+        county = owned[choice - 1]
+
+        existing = {b["kind"]: b for b in county.get("buildings", [])}
+        print(f"\n  {county['name']} 现有建筑：")
+        if existing:
+            for b in existing.values():
+                print(f"    {b['name']} Lv.{b['level']}/{b['max_level']} 下一级费用:{b['upgrade_cost'] if b['can_upgrade'] else '已满级'}")
+        else:
+            print("    （无）")
+
+        print("\n  选择要建造/升级的建筑：")
+        kinds = list(BuildingKind)
+        for i, k in enumerate(kinds, 1):
+            cur = existing.get(k.name)
+            if cur:
+                cost = cur["upgrade_cost"] if cur["can_upgrade"] else "-"
+                print(f"    {i}. {k.name_zh()} Lv.{cur['level']}/{k.max_level()} 费用:{cost} — {k.description()}")
+            else:
+                print(f"    {i}. {k.name_zh()} (新建 费用:{k.upgrade_cost(0)}) — {k.description()}")
+        print(f"    0. 返回")
+
+        try:
+            kchoice = int(input("\n选择 > ").strip())
+        except ValueError:
+            return
+        if kchoice == 0 or not (1 <= kchoice <= len(kinds)):
+            return
+        kind = kinds[kchoice - 1]
+
+        res = self.api.action({"action": "upgrade_building", "county_id": county["id"], "building_kind": kind.name})
+        msgs = [m for m in res.get("messages", []) if m]
+        print(f"\n  {msgs[-1] if msgs else '操作完成'}")
+        pause()
+
+    # ---------- 法律 ----------
+    def _menu_laws(self) -> None:
+        while True:
+            self.render("法律管理")
+            snap = self.api.snapshot()
+            laws = (snap.get("player") or {}).get("laws") or {}
+            print(f"\n  当前继承法: {laws.get('succession') or '无'}")
+            print(f"  当前王权:   {laws.get('crown_authority') if laws.get('crown_authority') is not None else '无'}")
+            print(f"  当前性别法: {laws.get('gender_law') or '无'}")
+            print("\n  1. 更改继承法")
+            print("  2. 更改王权")
+            print("  3. 更改性别法")
+            print("  0. 返回")
+            cmd = input("\n选择 > ").strip()
+            if cmd == "0":
+                break
+            elif cmd == "1":
+                self._pick_law("set_succession_law", "继承法", [(l.name, l.name_zh()) for l in SuccessionLaw])
+            elif cmd == "2":
+                self._pick_law("set_crown_authority", "王权", [(str(l.value), l.name_zh()) for l in CrownAuthority], is_level=True)
+            elif cmd == "3":
+                self._pick_law("set_gender_law", "性别法", [(l.name, l.name_zh()) for l in GenderLaw])
+
+    def _pick_law(self, action: str, label: str, options: List[tuple], is_level: bool = False) -> None:
+        print(f"\n  选择{label}：")
+        for i, (ename, cname) in enumerate(options, 1):
+            print(f"    {i}. {cname}")
+        print(f"    0. 返回")
+        try:
+            choice = int(input("\n选择 > ").strip())
+        except ValueError:
+            return
+        if choice == 0 or not (1 <= choice <= len(options)):
+            return
+        value = options[choice - 1][0]
+        payload = {"action": action, "level": int(value)} if is_level else {"action": action, "law": value}
+        res = self.api.action(payload)
+        msgs = [m for m in res.get("messages", []) if m]
+        print(f"\n  {msgs[-1] if msgs else '已更改'}")
+        pause()
+
+    # ---------- 求和 ----------
+    def _action_peace(self) -> None:
+        self.render("求和/白和")
+        snap = self.api.snapshot()
+        active = [w for w in snap.get("wars", []) if w.get("active") and w.get("involves_player")]
+        if not active:
+            print("\n  你没有进行中的战争")
+            pause()
+            return
+
+        print("\n  你的战争：")
+        for i, w in enumerate(active, 1):
+            tag = "可白和" if w.get("can_white_peace") else "条件不足"
+            print(f"    {i}. {w['name']} | 分数:{w.get('warscore', 0):.0f} 已持续:{w.get('months', 0)}月 [{tag}]")
+        print(f"    0. 返回")
+
+        try:
+            choice = int(input("\n选择 > ").strip())
+        except ValueError:
+            return
+        if choice == 0 or not (1 <= choice <= len(active)):
+            return
+        war = active[choice - 1]
+        res = self.api.action({"action": "white_peace", "war_id": war["id"]})
+        msgs = [m for m in res.get("messages", []) if m]
+        print(f"\n  {msgs[-1] if msgs else '操作完成'}")
+        pause()
+
+    # ---------- 派系 ----------
+    def _menu_factions(self) -> None:
+        self.render("派系管理")
+        snap = self.api.snapshot()
+        factions = snap.get("factions", [])
+        if not factions:
+            print("\n  目前没有针对你的派系")
+            pause()
+            return
+
+        print("\n  针对你的派系：")
+        for i, f in enumerate(factions, 1):
+            tag = "⚠已发最后通牒" if f.get("ultimatum") else ""
+            print(f"    {i}. {f['kind']} 成员:{f['members']} 实力:{f['power']} 不满:{f['discontent']} {tag}")
+        print(f"\n  安抚需花费 25 金")
+        print(f"    0. 返回")
+
+        try:
+            choice = int(input("\n选择安抚对象 > ").strip())
+        except ValueError:
+            return
+        if choice == 0 or not (1 <= choice <= len(factions)):
+            return
+        f = factions[choice - 1]
+        res = self.api.action({"action": "appease_faction", "faction_id": f["id"]})
+        msgs = [m for m in res.get("messages", []) if m]
+        print(f"\n  {msgs[-1] if msgs else '操作完成'}")
+        pause()
+
+    # ---------- 授予头衔 ----------
+    def _action_grant(self) -> None:
+        self.render("授予头衔")
+        w = self.api.sim.world
+        player = w.character(self.api.player_id)
+        if not player:
+            return
+        titles = [
+            t for t in w.titles.values()
+            if t.holder == self.api.player_id and t.id != player.primary_title
+        ]
+        if not titles:
+            print("\n  没有可授予的头衔（主头衔不可授予）")
+            pause()
+            return
+
+        print("\n  你的头衔：")
+        for i, t in enumerate(titles, 1):
+            print(f"    {i}. {t.name}")
+        print(f"    0. 返回")
+
+        try:
+            choice = int(input("\n选择头衔 > ").strip())
+        except ValueError:
+            return
+        if choice == 0 or not (1 <= choice <= len(titles)):
+            return
+        title = titles[choice - 1]
+
+        snap = self.api.snapshot()
+        chars = [c for c in snap.get("characters", []) if c.get("id") != self.api.player_id and c.get("is_alive")]
+        print(f"\n  授予给谁（{title.name}）：")
+        for i, c in enumerate(chars, 1):
+            print(f"    {i}. {c['name']} ({c.get('title') or '无头衔'})")
+        print(f"    0. 返回")
+
+        try:
+            cchoice = int(input("\n选择 > ").strip())
+        except ValueError:
+            return
+        if cchoice == 0 or not (1 <= cchoice <= len(chars)):
+            return
+        target = chars[cchoice - 1]
+
+        res = self.api.action({"action": "grant_title", "title_id": title.id, "target_id": target["id"]})
+        msgs = [m for m in res.get("messages", []) if m]
+        print(f"\n  {msgs[-1] if msgs else '已授予'}")
+        pause()
+
+    # ---------- 伪造宣称 ----------
+    def _action_claim(self) -> None:
+        self.render("伪造宣称")
+        snap = self.api.snapshot()
+        foreign = [c for c in snap.get("counties", []) if not c.get("is_player")]
+        if not foreign:
+            print("\n  没有可伪造宣称的省份")
+            pause()
+            return
+
+        print("\n  选择省份（花费 50 金）：")
+        for i, c in enumerate(foreign, 1):
+            print(f"    {i}. {c['name']} (领主:{c.get('holder_name', '?')})")
+        print(f"    0. 返回")
+
+        try:
+            choice = int(input("\n选择 > ").strip())
+        except ValueError:
+            return
+        if choice == 0 or not (1 <= choice <= len(foreign)):
+            return
+        county = foreign[choice - 1]
+
+        res = self.api.action({"action": "fabricate_claim", "county_id": county["id"]})
+        msgs = [m for m in res.get("messages", []) if m]
+        print(f"\n  {msgs[-1] if msgs else '操作完成'}")
+        pause()
+
+    # ---------- 发展领地 ----------
+    def _action_develop(self) -> None:
+        self.render("发展领地")
+        snap = self.api.snapshot()
+        owned = [c for c in snap.get("counties", []) if c.get("is_player")]
+        if not owned:
+            print("\n  你没有领地")
+            pause()
+            return
+
+        print("\n  选择省份（每级花费 10 金）：")
+        for i, c in enumerate(owned, 1):
+            cap = c.get("dev_cap")
+            cap_str = f"/{cap}" if cap else ""
+            print(f"    {i}. {c['name']} (发展:{c['development']}{cap_str} 税收:{c['tax']:.1f})")
+        print(f"    0. 返回")
+
+        try:
+            choice = int(input("\n选择 > ").strip())
+        except ValueError:
+            return
+        if choice == 0 or not (1 <= choice <= len(owned)):
+            return
+        county = owned[choice - 1]
+
+        res = self.api.action({"action": "develop_county", "county_id": county["id"]})
+        msgs = [m for m in res.get("messages", []) if m]
+        print(f"\n  {msgs[-1] if msgs else '操作完成'}")
+        pause()
+
+    # ---------- 招募精锐 ----------
+    def _action_knights(self) -> None:
+        self.render("招募精锐")
+        print("\n  招募精锐部队（花费 25 金）：重骑兵+40 重步兵+80")
+        print("  需要已有野战军。确认招募？(y/n)")
+        if input("> ").strip().lower() not in ("y", "yes", "是"):
+            return
+        res = self.api.action({"action": "recruit_knights"})
+        msgs = [m for m in res.get("messages", []) if m]
+        print(f"\n  {msgs[-1] if msgs else '操作完成'}")
+        pause()
+
+    # ---------- 任命指挥官 ----------
+    def _action_commander(self) -> None:
+        self.render("任命指挥官")
+        snap = self.api.snapshot()
+        armies = [a for a in snap.get("armies", []) if a.get("is_player") and a.get("status") != "DISBANDED"]
+        if not armies:
+            print("\n  没有可指挥的军团")
+            pause()
+            return
+
+        print("\n  选择军团：")
+        for i, a in enumerate(armies, 1):
+            print(f"    {i}. {a['name']} (兵力:{a['men']} 位置:{a.get('location_name', '?')})")
+        print(f"    0. 返回")
+
+        try:
+            choice = int(input("\n选择 > ").strip())
+        except ValueError:
+            return
+        if choice == 0 or not (1 <= choice <= len(armies)):
+            return
+        army = armies[choice - 1]
+
+        chars = [c for c in snap.get("characters", []) if c.get("id") != self.api.player_id and c.get("age", 0) >= 16]
+        print("\n  选择指挥官：")
+        for i, c in enumerate(chars, 1):
+            attrs = c.get("attrs", {})
+            print(f"    {i}. {c['name']} (军略:{attrs.get('martial', 0)} 勇武:{attrs.get('prowess', 0)})")
+        print(f"    0. 返回")
+
+        try:
+            cchoice = int(input("\n选择 > ").strip())
+        except ValueError:
+            return
+        if cchoice == 0 or not (1 <= cchoice <= len(chars)):
+            return
+        target = chars[cchoice - 1]
+
+        res = self.api.action({"action": "set_commander", "army_id": army["id"], "character_id": target["id"]})
+        msgs = [m for m in res.get("messages", []) if m]
+        print(f"\n  {msgs[-1] if msgs else '已任命'}")
+        pause()
+
+    # ---------- 查看宣称 ----------
+    def _show_claims(self) -> None:
+        self.render("我的宣称")
+        snap = self.api.snapshot()
+        claims = snap.get("player_claims", [])
+        if not claims:
+            print("\n  你没有任何宣称")
+        else:
+            print("\n  你的宣称：")
+            for c in claims:
+                target = c.get("title_name") or c.get("county_name") or "?"
+                pressed = "已压制" if c.get("pressed") else "未压制"
+                print(f"    {target} (强度:{c.get('strength', 0)} {pressed})")
+        pause()
+
+    # ---------- 查看条约 ----------
+    def _show_treaties(self) -> None:
+        self.render("条约/停战")
+        snap = self.api.snapshot()
+        treaties = snap.get("treaties", [])
+        if not treaties:
+            print("\n  没有生效的条约")
+        else:
+            print("\n  生效的条约：")
+            for t in treaties:
+                print(f"    {t.get('kind_zh', t.get('kind'))} ↔ {t.get('other_name', '?')} (至 {t.get('expires_year', '?')} 年)")
+        pause()
+
+    # ---------- 查看君主 ----------
+    def _show_rulers(self) -> None:
+        self.render("各国君主")
+        snap = self.api.snapshot()
+        print(f"\n  {'名字':<12} {'头衔':<12} {'金':<7} {'威望':<7} {'军略':<5} {'收入':<7} {'兵力':<7} 性格")
+        print("  " + "-" * 75)
+        for r in snap.get("rulers", []):
+            marker = "*" if r.get("is_player") else " "
+            print(
+                f"  {marker}{r['name']:<11} {r.get('title', '无'):<12} "
+                f"{r.get('gold', 0):<7.0f} {r.get('prestige', 0):<7.0f} "
+                f"{r.get('martial', 0):<5} {r.get('income', 0):<7.1f} {r.get('men', 0):<7} "
+                f"{r.get('persona', '')}"
+            )
+        print(f"\n  * 表示当前玩家")
+        pause()
+
+    # ---------- 新游戏 ----------
+    def _action_new_game(self) -> None:
+        self.render("新游戏")
+        print("\n  开始新游戏将丢失当前进度（已有存档不受影响）。确认？(y/n)")
+        if input("> ").strip().lower() not in ("y", "yes", "是"):
+            return
+        self.api.action({"action": "new_game"})
+        print("\n  新局开始")
+        pause()
+
+    # ---------- 切换玩家 ----------
+    def _action_switch_player(self) -> None:
+        self.render("切换玩家")
+        snap = self.api.snapshot()
+        playable = snap.get("playable", [])
+        print("\n  可选统治者：")
+        for i, p in enumerate(playable, 1):
+            marker = "*" if p["id"] == self.api.player_id else " "
+            print(f"    {marker}{i}. {p['name']} ({p.get('title') or '无'})")
+        print(f"    0. 返回")
+
+        try:
+            choice = int(input("\n选择 > ").strip())
+        except ValueError:
+            return
+        if choice == 0 or not (1 <= choice <= len(playable)):
+            return
+        target = playable[choice - 1]
+        self.api.action({"action": "set_player", "character_id": target["id"]})
+        print(f"\n  已切换为 {target['name']}")
+        pause()
+
     # ---------- 推进时间 ----------
     def _action_advance(self) -> None:
         self.render("推进时间")
@@ -550,9 +969,13 @@ class GameTUI:
 
         pos_name = positions[choice - 1][0]
         chars = [c for c in snap.get("characters", []) if c.get("id") != self.api.player_id and c.get("age", 0) >= 16]
+        if not chars:
+            print("\n  没有可选人选")
+            pause()
+            return
         print("\n  选择人选：")
         for i, c in enumerate(chars, 1):
-            print(f"    {i}. {c['name']}")
+            print(f"    {i}. {c['name']} ({c.get('title') or '无头衔'}, {c.get('age', '?')}岁)")
         print(f"    0. 返回")
 
         try:
@@ -561,12 +984,12 @@ class GameTUI:
             return
         if cid == 0:
             return
-        if not any(c["id"] == cid for c in chars):
+        if not (1 <= cid <= len(chars)):
             print("无效选择")
             pause()
             return
 
-        self.api.action({"action": "appoint_council", "position": pos_name, "character_id": cid})
+        self.api.action({"action": "appoint_council", "position": pos_name, "character_id": chars[cid - 1]["id"]})
         print(f"\n  已任命")
         pause()
 
@@ -661,7 +1084,7 @@ class GameTUI:
     def _action_start_scheme(self) -> None:
         self.render("发起阴谋")
         snap = self.api.snapshot()
-        chars = [c for c in snap.get("characters", []) if c.get("id") != self.api.player_id and c.get("is_alive") if c.get("id") != self.api.player_id]
+        chars = [c for c in snap.get("characters", []) if c.get("id") != self.api.player_id and c.get("is_alive")]
         print("\n  选择目标：")
         for i, c in enumerate(chars, 1):
             print(f"    {i}. {c['name']}")
@@ -741,6 +1164,9 @@ class GameTUI:
             print("    6. 联姻")
             print("    7. 赠送礼物")
             print("    8. 设为宿敌")
+            print("    9. 邀请入宫廷 (30金)")
+            print("   10. 为其举办宴会 (40金)")
+            print("   11. 决斗")
             print("    0. 返回")
 
             act = input("\n选择 > ").strip()
@@ -754,6 +1180,9 @@ class GameTUI:
                 "3": ("form_vassalage", {}),
                 "4": ("form_trade_agreement", {}),
                 "5": ("form_intelligence_sharing", {}),
+                "9": ("invite_to_court", {}),
+                "10": ("host_feast_for", {}),
+                "11": ("duel", {}),
             }
             if act in action_map:
                 aname, _ = action_map[act]

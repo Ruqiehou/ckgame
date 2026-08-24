@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
 from ck_engine.core import AttributeSet, GameDate
 from ck_engine.world import Gender, Terrain, TitleTier, World
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "data" / "scenarios"
+BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+DATA_DIR = BASE_DIR / "data" / "scenarios"
 
 
 def _date(arr: List[int]) -> GameDate:

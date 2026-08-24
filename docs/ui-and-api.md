@@ -23,10 +23,16 @@
 
 - `advance`：推进时间
 - `declare_war`：宣战
+- `white_peace`：求和白和
 - `form_alliance`：结盟
 - `start_scheme`：发起阴谋
 - `appoint_council`：任命内阁
 - `set_succession_law` / `set_crown_authority` / `set_gender_law`：改法
+- `upgrade_building` / `develop_county`：建造与发展
+- `fabricate_claim`：伪造宣称
+- `grant_title`：授予头衔
+- `invite_to_court` / `host_feast_for` / `duel`：宫廷互动
+- `set_player`：切换玩家
 
 ## 地图
 
