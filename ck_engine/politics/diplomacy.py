@@ -44,6 +44,7 @@ class CasusBelli(Enum):
             CasusBelli.DE_JURE: 75.0,
             CasusBelli.RIVALRY: 25.0,
             CasusBelli.SUBJUGATION: 200.0,
+            CasusBelli.TRADE_WAR: 50.0,  # 贸易战争成本较低
         }[self]
 
     def attacker_prestige_on_win(self) -> float:
@@ -56,6 +57,7 @@ class CasusBelli(Enum):
             CasusBelli.DE_JURE: 60.0,
             CasusBelli.RIVALRY: 40.0,
             CasusBelli.SUBJUGATION: 200.0,
+            CasusBelli.TRADE_WAR: 60.0,  # 贸易战争奖励
         }[self]
 
 

@@ -97,7 +97,7 @@ class GameAPI:
                     "levies": county.monthly_levies(),
                     "tax": round(county.monthly_tax(), 2),
                     "fort": county.fort_level,
-                    "buildings": list(county.buildings),
+                    "buildings": self._county_buildings(county.id),
                     "holder_id": county.holder if county.holder != NONE_ID else None,
                     "holder_name": holder.name if holder else "无主",
                     "color": color,
@@ -117,6 +117,13 @@ class GameAPI:
                     ),
                     "is_player": bool(holder and holder.id == self.player_id),
                     "buildings": self._county_buildings(county.id),
+                    "has_port": county.has_port,
+                    "port_level": county.port_level,
+                    "port_income": round(county.port_income, 1),
+                    "trade_route_protected": county.trade_route_protected,
+                    "trade_route_protection_level": county.trade_route_protection_level,
+                    "trade_route_maintenance_level": county.trade_route_maintenance_level,
+                    "trade_route_upgrade_cost": round(county.trade_route_upgrade_cost, 1),
                 }
             )
 
@@ -637,6 +644,10 @@ class GameAPI:
                 self._fabricate_claim(int(payload["county_id"]))
             elif kind == "upgrade_building":
                 self._upgrade_building(int(payload["county_id"]), payload.get("building_kind"))
+            elif kind == "upgrade_port":
+                self._upgrade_port(int(payload["county_id"]))
+            elif kind == "upgrade_trade_route_maintenance":
+                self._upgrade_trade_route_maintenance(int(payload["county_id"]))
             elif kind == "toggle_cheat":
                 self.cheat_mode = not self.cheat_mode
                 if self.cheat_mode:
@@ -1150,6 +1161,34 @@ class GameAPI:
         player.add_gold(-10)
         county.development = min(cap, county.development + 1)
         self.notify(f"{county.name} 发展度 +1（→ {county.development}）")
+
+    def _upgrade_port(self, county_id: int) -> None:
+        county = self.sim.world.map.get(county_id)
+        if not county:
+            raise ValueError("省份不存在")
+        if county.holder != self.player_id:
+            raise ValueError("不是己方领地")
+        if not county.has_port:
+            raise ValueError("该省份没有港口")
+        player = self.sim.world.character(self.player_id)
+        upgrade_cost = county.upgrade_port()
+        if player.gold < upgrade_cost:
+            raise ValueError(f"金币不足（需要 {upgrade_cost:.0f}）")
+        player.add_gold(-upgrade_cost)
+        self.notify(f"{county.name} 港口升级到 {county.port_level} 级（花费 {upgrade_cost:.0f} 金）")
+
+    def _upgrade_trade_route_maintenance(self, county_id: int) -> None:
+        county = self.sim.world.map.get(county_id)
+        if not county:
+            raise ValueError("省份不存在")
+        if county.holder != self.player_id:
+            raise ValueError("不是己方领地")
+        player = self.sim.world.character(self.player_id)
+        upgrade_cost = county.upgrade_trade_route_maintenance()
+        if player.gold < upgrade_cost:
+            raise ValueError(f"金币不足（需要 {upgrade_cost:.0f}）")
+        player.add_gold(-upgrade_cost)
+        self.notify(f"{county.name} 贸易路线维护升级到 {county.trade_route_maintenance_level} 级（花费 {upgrade_cost:.0f} 金）")
 
     def _recruit_knights(self) -> None:
         player = self.sim.world.character(self.player_id)

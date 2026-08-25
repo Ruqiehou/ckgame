@@ -450,6 +450,25 @@ class World:
                     if event_chance < 0.05:  # 5%概率发生贸易事件
                         self.trigger_trade_event(route)
             
+            # 支付贸易路线维护成本
+            for route in self.trade_routes:
+                if route["from"] == c.primary_title or route["to"] == c.primary_title:
+                    maintenance_cost = route["trade_volume"] * 0.05
+                    income -= maintenance_cost
+                    self.push_log(f"{c.name} 支付贸易路线维护成本：{maintenance_cost:.1f} 金")
+            
+            # 支付港口维护成本
+            for tid in c.held_titles:
+                t = self.title(tid)
+                if not t:
+                    continue
+                for cid in t.counties:
+                    county = self.map.get(cid)
+                    if county and county.has_port:
+                        port_maintenance_cost = county.port_income * 0.2  # 港口收入的20%作为维护成本
+                        income -= port_maintenance_cost
+                        self.push_log(f"{c.name} 支付港口维护成本：{port_maintenance_cost:.1f} 金")
+            
             for tid in c.held_titles:
                 t = self.title(tid)
                 if not t:
@@ -547,6 +566,26 @@ class World:
                 self.exchange_rates[key] *= fluctuation
                 # 限制汇率范围
                 self.exchange_rates[key] = max(0.5, min(2.0, self.exchange_rates[key]))
+                
+                # 贸易路线维护成本
+                maintenance_cost = route["trade_volume"] * 0.05
+                
+                # 检查贸易路线经过的省份是否有维护等级
+                from_county = self.map.get_by_key(route["from"])
+                to_county = self.map.get_by_key(route["to"])
+                maintenance_bonus = 1.0
+                
+                if from_county:
+                    maintenance_bonus *= from_county.get_trade_route_maintenance_bonus()
+                if to_county:
+                    maintenance_bonus *= to_county.get_trade_route_maintenance_bonus()
+                
+                maintenance_cost *= maintenance_bonus
+                
+                # 如果不支付维护成本，贸易量下降
+                if random.random() < 0.1:  # 10%概率需要维护
+                    route["trade_volume"] *= 0.9
+                    self.push_log(f"贸易路线 {route['from']} → {route['to']} 维护不足，贸易量下降")
 
         for county in self.map.counties.values():
             if county.control > 80 and county.development < county.terrain.development_cap():

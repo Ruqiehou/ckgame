@@ -10,20 +10,20 @@
     {"key": "bretagne", "name": "布列塔尼"}
   ],
   "counties": [
-    {"key": "middlesex", "name": "米德尔塞克斯", "terrain": "FARMLAND", "development": 28, "levies": 450, "tax": 2.2, "fort": 3},
+    {"key": "middlesex", "name": "米德尔塞克斯", "terrain": "FARMLAND", "development": 28, "levies": 450, "tax": 2.2, "fort": 3, "has_port": true, "port_level": 2, "trade_route_maintenance_level": 1},
     {"key": "wessex", "name": "威塞克斯", "terrain": "PLAINS", "development": 20, "levies": 320, "tax": 1.6, "fort": 2},
-    {"key": "kent", "name": "肯特", "terrain": "COASTAL", "development": 18, "levies": 280, "tax": 1.5, "fort": 2},
+    {"key": "kent", "name": "肯特", "terrain": "COASTAL", "development": 18, "levies": 280, "tax": 1.5, "fort": 2, "has_port": true, "port_level": 1, "trade_route_protected": true, "trade_route_protection_level": 1},
     {"key": "mercia", "name": "麦西亚", "terrain": "FARMLAND", "development": 16, "levies": 300, "tax": 1.4, "fort": 2},
-    {"key": "york", "name": "约克", "terrain": "HILLS", "development": 14, "levies": 260, "tax": 1.2, "fort": 2},
+    {"key": "york", "name": "约克", "terrain": "HILLS", "development": 14, "levies": 260, "tax": 1.2, "fort": 2, "trade_route_maintenance_level": 1},
     {"key": "northumbria", "name": "诺森布里亚", "terrain": "HILLS", "development": 10, "levies": 220, "tax": 1.0, "fort": 2},
-    {"key": "normandy", "name": "诺曼底", "terrain": "COASTAL", "development": 24, "levies": 380, "tax": 1.9, "fort": 3},
-    {"key": "rouen", "name": "鲁昂", "terrain": "FARMLAND", "development": 22, "levies": 300, "tax": 1.7, "fort": 2},
+    {"key": "normandy", "name": "诺曼底", "terrain": "COASTAL", "development": 24, "levies": 380, "tax": 1.9, "fort": 3, "has_port": true, "port_level": 2, "trade_route_protected": true, "trade_route_protection_level": 2},
+    {"key": "rouen", "name": "鲁昂", "terrain": "FARMLAND", "development": 22, "levies": 300, "tax": 1.7, "fort": 2, "trade_route_maintenance_level": 1},
     {"key": "east_anglia", "name": "东盎格利亚", "terrain": "WETLAND", "development": 12, "levies": 200, "tax": 1.1, "fort": 1},
     {"key": "cornwall", "name": "康沃尔", "terrain": "HILLS", "development": 8, "levies": 150, "tax": 0.8, "fort": 1},
-    {"key": "sussex", "name": "苏塞克斯", "terrain": "COASTAL", "development": 15, "levies": 240, "tax": 1.3, "fort": 2},
-    {"key": "lincoln", "name": "林肯", "terrain": "PLAINS", "development": 13, "levies": 230, "tax": 1.2, "fort": 1},
-    {"key": "caen", "name": "卡昂", "terrain": "PLAINS", "development": 18, "levies": 270, "tax": 1.5, "fort": 2},
-    {"key": "bayeux", "name": "贝叶", "terrain": "HILLS", "development": 14, "levies": 200, "tax": 1.2, "fort": 2}
+    {"key": "sussex", "name": "苏塞克斯", "terrain": "COASTAL", "development": 15, "levies": 240, "tax": 1.3, "fort": 2, "has_port": true, "port_level": 1},
+    {"key": "lincoln", "name": "林肯", "terrain": "PLAINS", "development": 13, "levies": 230, "tax": 1.2, "fort": 1, "trade_route_maintenance_level": 1},
+    {"key": "caen", "name": "卡昂", "terrain": "PLAINS", "development": 18, "levies": 270, "tax": 1.5, "fort": 2, "has_port": true, "port_level": 1},
+    {"key": "bayeux", "name": "贝叶", "terrain": "HILLS", "development": 14, "levies": 200, "tax": 1.2, "fort": 2, "trade_route_maintenance_level": 1}
   ],
   "connections": [
     ["middlesex", "wessex"], ["middlesex", "kent"], ["middlesex", "mercia"],

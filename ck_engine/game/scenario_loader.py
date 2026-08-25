@@ -64,6 +64,11 @@ def load_scenario(path: Path | str | None = None) -> World:
         c.buildings = ["庄园", "市场"]
         if c.fort_level >= 2:
             c.buildings.append("城堡")
+        c.trade_route_protected = bool(row.get("trade_route_protected", False))
+        c.trade_route_protection_level = int(row.get("trade_route_protection_level", 0))
+        c.has_port = bool(row.get("has_port", False))
+        c.port_level = int(row.get("port_level", 0))
+        c.trade_route_maintenance_level = int(row.get("trade_route_maintenance_level", 0))
 
     for a, b in data.get("connections", []):
         world.map.connect(counties[a], counties[b])

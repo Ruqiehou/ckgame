@@ -78,6 +78,8 @@ class County:
     has_port: bool = False  # 是否有港口
     port_level: int = 0  # 港口等级
     port_income: float = 0.0  # 港口收入
+    trade_route_maintenance_level: int = 0  # 贸易路线维护等级
+    trade_route_upgrade_cost: float = 0.0  # 升级成本
 
     @staticmethod
     def new(county_id: int, name: str, terrain: Terrain) -> County:
@@ -86,6 +88,22 @@ class County:
     def monthly_tax(self) -> float:
         base = self.tax * (1.0 + self.development * 0.02)
         return base * (self.control / 100.0) * self.terrain.supply_limit()
+
+    def upgrade_trade_route_maintenance(self) -> float:
+        """升级贸易路线维护等级"""
+        if self.trade_route_maintenance_level >= 5:
+            return 0.0  # 已达最高级
+        
+        self.trade_route_maintenance_level += 1
+        self.trade_route_upgrade_cost = 100.0 * self.trade_route_maintenance_level
+        self.trade_route_maintenance_cost = 10.0 * self.trade_route_maintenance_level
+        
+        # 维护等级提升减少维护成本
+        return self.trade_route_upgrade_cost
+
+    def get_trade_route_maintenance_bonus(self) -> float:
+        """获取贸易路线维护加成"""
+        return 1.0 - (self.trade_route_maintenance_level * 0.1)  # 每级减少10%维护成本
 
     def monthly_levies(self) -> int:
         base = self.levies * (1.0 + self.development * 0.01)
@@ -102,16 +120,42 @@ class County:
                 cost += 0.2
         return cost
 
+    def calculate_port_income(self) -> float:
+        """计算港口收入"""
+        if not self.has_port:
+            return 0.0
+        
+        # 港口收入基于港口等级和省份发展度
+        base_income = 50.0 * self.port_level
+        development_bonus = 1.0 + (self.development / 100.0)
+        return base_income * development_bonus
+
+    def upgrade_port(self) -> float:
+        """升级港口"""
+        if self.port_level >= 5:
+            return 0.0  # 已达最高级
+        
+        self.port_level += 1
+        upgrade_cost = 200.0 * self.port_level
+        self.port_income = self.calculate_port_income()
+        
+        return upgrade_cost
+
 
 @dataclass
 class MapGraph:
     counties: Dict[int, County] = field(default_factory=dict)
+    county_by_key: Dict[str, County] = field(default_factory=dict)
 
     def insert(self, county: County) -> None:
         self.counties[county.id] = county
+        self.county_by_key[county.name.lower()] = county
 
     def get(self, county_id: int) -> Optional[County]:
         return self.counties.get(county_id)
+
+    def get_by_key(self, key: str) -> Optional[County]:
+        return self.county_by_key.get(key.lower())
 
     def connect(self, a: int, b: int) -> None:
         ca, cb = self.counties.get(a), self.counties.get(b)
