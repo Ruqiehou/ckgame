@@ -151,6 +151,8 @@ class DiplomacySystem:
         self.treaties.append(
             Treaty(a=a, b=b, kind=TreatyKind.TRADE_AGREEMENT, start=date, expires_year=date.year + 30)
         )
+        # 标记贸易协定关系
+        self.flags_mut(a, b).trade_agreement = True
 
     def form_intelligence_sharing(self, a: int, b: int, date: GameDate) -> None:
         self.treaties.append(

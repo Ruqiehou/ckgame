@@ -391,7 +391,17 @@ class World:
                         # 根据贸易量和汇率计算收入
                         trade_volume = route["trade_volume"]
                         exchange_rate = self.exchange_rates.get((route["from"], route["to"]), 1.0)
-                        income += trade_volume * exchange_rate * 0.1  # 10%作为税收
+                        
+                        # 检查是否有贸易协定
+                        trade_bonus = 1.0
+                        for other_ruler in self.rulers():
+                            if other_ruler.id != ruler:
+                                dip = self.sim.diplomacy
+                                if dip.flags(ruler, other_ruler.id).trade_agreement:
+                                    # 贸易协定增加20%贸易量
+                                    trade_bonus *= 1.2
+                        
+                        income += trade_volume * exchange_rate * 0.1 * trade_bonus  # 10%作为税收
         return income
 
     # ---------- 经济 ----------
@@ -462,33 +472,52 @@ class World:
 
     def trigger_trade_event(self, route: Dict) -> None:
         """触发贸易事件"""
-        event_type = random.choice(["blockade", "boom", "crisis", "new_route"])
+        event_type = random.choice(["blockade", "boom", "crisis", "new_route", "trade_route_protected"])
         event_desc = ""
         
+        # 检查商路保护
+        from_county = self.map.get_by_key(route["from"])
+        to_county = self.map.get_by_key(route["to"])
+        protection_bonus = 1.0
+        
+        if from_county and from_county.trade_route_protected:
+            protection_bonus *= 1.3
+        if to_county and to_county.trade_route_protected:
+            protection_bonus *= 1.3
+        
         if event_type == "blockade":
-            event_desc = f"贸易路线 {route['from']} → {route['to']} 被封锁，收入减少"
-            # 降低汇率
-            key = (route["from"], route["to"])
-            if key in self.exchange_rates:
-                self.exchange_rates[key] *= 0.8
+            # 商路保护可以减少封锁的影响
+            if protection_bonus > 1.0 and random.random() < 0.5:
+                event_type = "protected_from_blockade"
+                event_desc = f"贸易路线 {route['from']} → {route['to']} 遭遇封锁，但商路保护减少了损失"
+                key = (route["from"], route["to"])
+                if key in self.exchange_rates:
+                    self.exchange_rates[key] *= 0.9  # 影响较小
+            else:
+                event_desc = f"贸易路线 {route['from']} → {route['to']} 被封锁，收入减少"
+                key = (route["from"], route["to"])
+                if key in self.exchange_rates:
+                    self.exchange_rates[key] *= 0.8
         elif event_type == "boom":
             event_desc = f"贸易路线 {route['from']} → {route['to']} 繁荣，收入增加"
-            # 提高汇率
             key = (route["from"], route["to"])
             if key in self.exchange_rates:
-                self.exchange_rates[key] *= 1.2
+                self.exchange_rates[key] *= 1.2 * protection_bonus
         elif event_type == "crisis":
             event_desc = f"贸易路线 {route['from']} → {route['to']} 遭遇危机，收入大幅减少"
-            # 大幅降低汇率
             key = (route["from"], route["to"])
             if key in self.exchange_rates:
                 self.exchange_rates[key] *= 0.6
         elif event_type == "new_route":
             event_desc = f"新的贸易路线 {route['from']} → {route['to']} 建立，收入增加"
-            # 提高汇率
             key = (route["from"], route["to"])
             if key in self.exchange_rates:
-                self.exchange_rates[key] *= 1.1
+                self.exchange_rates[key] *= 1.1 * protection_bonus
+        elif event_type == "trade_route_protected":
+            event_desc = f"商路保护加强：贸易路线 {route['from']} → {route['to']} 得到保护，收入增加"
+            key = (route["from"], route["to"])
+            if key in self.exchange_rates:
+                self.exchange_rates[key] *= 1.15
         
         self.push_log(event_desc)
         self.trade_events.append({

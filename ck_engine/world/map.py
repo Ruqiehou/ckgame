@@ -72,6 +72,9 @@ class County:
     levies: int = 200
     tax: float = 1.0
     neighbors: List[int] = field(default_factory=list)
+    trade_route_protected: bool = False  # 商路保护
+    trade_route_protection_level: int = 0  # 保护等级
+    trade_route_maintenance_cost: float = 0.0  # 维护成本
 
     @staticmethod
     def new(county_id: int, name: str, terrain: Terrain) -> County:
