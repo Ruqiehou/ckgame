@@ -16,6 +16,7 @@ class CasusBelli(Enum):
     DE_JURE = auto()
     RIVALRY = auto()
     SUBJUGATION = auto()
+    TRADE_WAR = auto()  # 贸易战争
 
     def name_zh(self) -> str:
         return {
@@ -27,6 +28,7 @@ class CasusBelli(Enum):
             CasusBelli.DE_JURE: "法理战争",
             CasusBelli.RIVALRY: "世仇战争",
             CasusBelli.SUBJUGATION: "臣服战争",
+            CasusBelli.TRADE_WAR: "贸易战争",
         }[self]
 
     def warscore_goal(self) -> int:
