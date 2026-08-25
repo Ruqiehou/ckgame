@@ -75,6 +75,9 @@ class County:
     trade_route_protected: bool = False  # 商路保护
     trade_route_protection_level: int = 0  # 保护等级
     trade_route_maintenance_cost: float = 0.0  # 维护成本
+    has_port: bool = False  # 是否有港口
+    port_level: int = 0  # 港口等级
+    port_income: float = 0.0  # 港口收入
 
     @staticmethod
     def new(county_id: int, name: str, terrain: Terrain) -> County:
