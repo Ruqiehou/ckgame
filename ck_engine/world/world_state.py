@@ -401,7 +401,17 @@ class World:
                                     # 贸易协定增加20%贸易量
                                     trade_bonus *= 1.2
                         
-                        income += trade_volume * exchange_rate * 0.1 * trade_bonus  # 10%作为税收
+                        # 检查是否有港口
+                        port_bonus = 1.0
+                        if county.has_port:
+                            port_bonus *= (1.0 + county.port_level * 0.2)  # 港口等级提升贸易量
+                        
+                        income += trade_volume * exchange_rate * 0.1 * trade_bonus * port_bonus  # 10%作为税收
+                        
+                        # 添加港口收入
+                        if county.has_port:
+                            income += county.port_income * 0.5  # 港口收入的50%作为税收
+        
         return income
 
     # ---------- 经济 ----------
