@@ -19,7 +19,6 @@
     </properties>
 
     <dependencies>
-        <!-- 无第三方运行时依赖，纯标准库 -->
     </dependencies>
 
     <build>
@@ -37,7 +36,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.ckgame.game.Main</mainClass>
+                            <mainClass>com.ckgame.ui.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
