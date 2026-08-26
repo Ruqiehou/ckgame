@@ -142,6 +142,30 @@ class GameSimulation:
 
     def tick_month(self) -> None:
         self.world.process_health()
+
+        # 军队维护费：破产时强制解散部分军团（在收税前用上个月结余支付）
+        by_owner: Dict[int, List] = {}
+        for army in self.wars.armies.values():
+            if army.is_active():
+                by_owner.setdefault(army.owner, []).append(army)
+        for owner, armies in by_owner.items():
+            c = self.world.character(owner)
+            if not c:
+                continue
+            cost = sum(a.monthly_maintenance() for a in armies)
+            # 维护费略抬高，避免常备军无代价
+            cost *= 1.25
+            if c.gold >= cost:
+                c.add_gold(-cost)
+                continue
+            # 掏空国库并每月最多解散一支最大军团
+            c.add_gold(-c.gold)
+            armies.sort(key=lambda a: a.total_men(), reverse=True)
+            dis = armies[0]
+            dis.status = ArmyStatus.DISBANDED
+            dis.stacks.clear()
+            self.world.push_log(f"{c.name} 国库空虚，被迫解散 {dis.name}")
+
         self.world.process_monthly_economy()
         self.world.process_fertility()
 
@@ -189,29 +213,6 @@ class GameSimulation:
             at_war_ids.add(w.defender_primary)
         self.diplomacy.tick_war_exhaustion(except_ids=at_war_ids)
         self.try_start_sieges()
-
-        # 军队维护费：破产时强制解散部分军团
-        by_owner: Dict[int, List] = {}
-        for army in self.wars.armies.values():
-            if army.is_active():
-                by_owner.setdefault(army.owner, []).append(army)
-        for owner, armies in by_owner.items():
-            c = self.world.character(owner)
-            if not c:
-                continue
-            cost = sum(a.monthly_maintenance() for a in armies)
-            # 维护费略抬高，避免常备军无代价
-            cost *= 1.25
-            if c.gold >= cost:
-                c.add_gold(-cost)
-                continue
-            # 掏空国库并每月最多解散一支最大军团
-            c.add_gold(-c.gold)
-            armies.sort(key=lambda a: a.total_men(), reverse=True)
-            dis = armies[0]
-            dis.status = ArmyStatus.DISBANDED
-            dis.stacks.clear()
-            self.world.push_log(f"{c.name} 国库空虚，被迫解散 {dis.name}")
 
         for r in list(self.world.rulers()):
             self.ensure_council(r.id)

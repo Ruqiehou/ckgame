@@ -60,6 +60,7 @@ class County:
     id: int
     name: str
     terrain: Terrain
+    key: str = ""
     development: int = 10
     control: float = 100.0
     prosperity: float = 50.0

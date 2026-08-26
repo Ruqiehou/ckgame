@@ -57,6 +57,7 @@ def load_scenario(path: Path | str | None = None) -> World:
         c = world.map.get(cid)
         if not c:
             continue
+        c.key = row["key"]
         c.development = int(row.get("development", c.development))
         c.levies = int(row.get("levies", c.levies))
         c.tax = float(row.get("tax", c.tax))

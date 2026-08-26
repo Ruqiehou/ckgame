@@ -392,15 +392,9 @@ class World:
                         trade_volume = route["trade_volume"]
                         exchange_rate = self.exchange_rates.get((route["from"], route["to"]), 1.0)
                         
-                        # 检查是否有贸易协定
+                        # 贸易协定加成由 simulation 层处理
                         trade_bonus = 1.0
-                        for other_ruler in self.rulers():
-                            if other_ruler.id != ruler:
-                                dip = self.sim.diplomacy
-                                if dip.flags(ruler, other_ruler.id).trade_agreement:
-                                    # 贸易协定增加20%贸易量
-                                    trade_bonus *= 1.2
-                        
+
                         # 检查是否有港口
                         port_bonus = 1.0
                         if county.has_port:
