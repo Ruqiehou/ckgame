@@ -7,8 +7,8 @@ import com.ckgame.core.calendar.GameDate;
 import com.ckgame.core.stats.AttributeSet;
 import com.ckgame.core.traits.Trait;
 import com.ckgame.core.traits.Traits;
-import com.ckgame.politics.HeirCandidate;
-import com.ckgame.politics.RealmLaw;
+import com.ckgame.politics.Laws.HeirCandidate;
+import com.ckgame.politics.Laws.RealmLaw;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,10 +36,27 @@ public final class World {
     public final Map<String, Double> exchangeRates = new HashMap<>();
     public final List<TradeEvent> tradeEvents = new ArrayList<>();
 
-    private final Random rng = new Random();
+    private final Random rng;
+
+    public World() {
+        this(null, new Random());
+    }
 
     public World(GameDate dateOrNull) {
+        this(dateOrNull, new Random());
+    }
+
+    public World(long seed) {
+        this(null, new Random(seed));
+    }
+
+    public World(GameDate dateOrNull, long seed) {
+        this(dateOrNull, new Random(seed));
+    }
+
+    private World(GameDate dateOrNull, Random rng) {
         this.date = dateOrNull != null ? dateOrNull : new GameDate(1066, 10, 14);
+        this.rng = rng;
     }
 
     public void pushLog(String msg) {
@@ -583,7 +600,7 @@ public final class World {
                     // 维护不足，贸易量下降
                     int newVolume = (int) Math.round(route.tradeVolume() * 0.9);
                     tradeRoutes.remove(route);
-                    tradeRoutes.add(new TradeRoute(route.from(), route.to(), newVolume, route.exchangeRate()));
+                    tradeRoutes.add(new TradeRoute(route.from(), route.to(), route.exchangeRate(), newVolume));
                     pushLog("贸易路线 " + route.from() + " → " + route.to() + " 维护不足，贸易量下降");
                 }
             }

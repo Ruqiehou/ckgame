@@ -2,7 +2,7 @@ package com.ckgame.world;
 
 import com.ckgame.core.Constants;
 import com.ckgame.core.TitleTier;
-import com.ckgame.politics.RealmLaw;
+import com.ckgame.politics.Laws.RealmLaw;
 
 import java.util.ArrayList;
 import java.util.List;
