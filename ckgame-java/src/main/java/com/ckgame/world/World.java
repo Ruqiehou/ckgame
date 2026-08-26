@@ -59,6 +59,23 @@ public final class World {
         this.rng = rng;
     }
 
+    /** 返回内部随机数生成器，供模拟器统一使用。 */
+    public Random rng() {
+        return rng;
+    }
+
+    public double nextDouble() {
+        return rng.nextDouble();
+    }
+
+    public int nextInt(int bound) {
+        return rng.nextInt(bound);
+    }
+
+    public int nextInt(int origin, int bound) {
+        return rng.nextInt(origin, bound);
+    }
+
     public void pushLog(String msg) {
         log.add("[" + date + "] " + msg);
         if (log.size() > 500) {
