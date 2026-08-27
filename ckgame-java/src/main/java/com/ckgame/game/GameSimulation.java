@@ -35,10 +35,11 @@ import com.ckgame.politics.Scheme;
 import com.ckgame.politics.SchemeKind;
 import com.ckgame.politics.SchemeManager;
 import com.ckgame.politics.SchemeOutcome;
+import com.ckgame.core.TitleTier;
 import com.ckgame.world.Character;
 import com.ckgame.world.County;
+import com.ckgame.world.MapGraph;
 import com.ckgame.world.Title;
-import com.ckgame.world.TitleTier;
 import com.ckgame.world.World;
 import com.ckgame.world.buildings.BuildingSystem;
 
@@ -83,6 +84,77 @@ public final class GameSimulation {
         this.buildings = new BuildingSystem();
         this.storylines = new StorylineSystem();
         bootstrap();
+    }
+
+    /** 从已加载的世界和各管理器重建模拟（供读档使用，跳过 bootstrap）。 */
+    public static GameSimulation reconstruct(World world, WarManager wars, SiegeManager sieges,
+                                              EventEngine events, FactionManager factions,
+                                              SchemeManager schemes, Diplomacy diplomacy,
+                                              CouncilManager councils, BuildingSystem buildings,
+                                              StorylineSystem storylines,
+                                              Map<Integer, RealmLaw> realmLaws,
+                                              Set<Integer> playerIds) {
+        GameSimulation sim = new GameSimulation();
+        // 替换默认初始化的各子系统
+        copyWorldState(sim.world, world);
+        sim.wars.wars.clear();
+        sim.wars.armies.clear();
+        sim.wars.wars.putAll(wars.wars);
+        sim.wars.armies.putAll(wars.armies);
+        sim.wars.nextWar = wars.nextWar;
+        sim.wars.nextArmy = wars.nextArmy;
+        sim.sieges.sieges.clear();
+        sim.sieges.sieges.putAll(sieges.sieges);
+        sim.sieges.nextId = sieges.nextId;
+        sim.events.pending.clear();
+        sim.events.pending.addAll(events.pending);
+        sim.factions.loadState(factions.saveState());
+        sim.schemes.loadState(schemes.saveState());
+        sim.diplomacy.loadState(diplomacy.saveState());
+        sim.councils.loadState(councils.saveState());
+        sim.buildings.loadState(buildings.saveState());
+        sim.storylines.storylines.clear();
+        sim.storylines.storylines.addAll(storylines.storylines);
+        sim.storylines.activePerCharacter.clear();
+        sim.storylines.activePerCharacter.putAll(storylines.activePerCharacter);
+        sim.realmLaws.clear();
+        sim.realmLaws.putAll(realmLaws);
+        sim.playerIds.clear();
+        sim.playerIds.addAll(playerIds);
+        return sim;
+    }
+
+    /** 将一个 World 的状态复制到另一个。 */
+    private static void copyWorldState(World dst, World src) {
+        dst.date = src.date;
+        dst.tick = src.tick;
+        dst.characters.clear();
+        dst.characters.putAll(src.characters);
+        dst.dynasties.clear();
+        dst.dynasties.putAll(src.dynasties);
+        dst.titles.clear();
+        dst.titles.putAll(src.titles);
+        dst.log.clear();
+        dst.log.addAll(src.log);
+        dst.nextChar = src.nextChar;
+        dst.nextDynasty = src.nextDynasty;
+        dst.nextTitle = src.nextTitle;
+        dst.nextCounty = src.nextCounty;
+        dst.tradeRoutes.clear();
+        dst.tradeRoutes.addAll(src.tradeRoutes);
+        dst.exchangeRates.clear();
+        dst.exchangeRates.putAll(src.exchangeRates);
+        dst.tradeEvents.clear();
+        dst.tradeEvents.addAll(src.tradeEvents);
+        // 重建地图（dst.map 是 final 的，直接插入）
+        for (County c : src.map.list()) {
+            dst.map.insert(c);
+        }
+        for (County c : src.map.list()) {
+            for (int n : c.neighbors) {
+                dst.map.connect(c.id, n);
+            }
+        }
     }
 
     /** 初始化：宿敌与宣称、同盟、内阁与法律、剧情线注册。 */
@@ -190,7 +262,7 @@ public final class GameSimulation {
         }
         if (world.date.isYearStart()) {
             world.pushLog("—— " + world.date.year() + " 年来临 ——");
-            for (String line : diplomacy.expireTreaties(world.date.year())) {
+            for (String line : diplomacy.expireTreaties(world.date.year(), world)) {
                 world.pushLog(line);
             }
         }
@@ -527,7 +599,7 @@ public final class GameSimulation {
                 intrigue.put(c.id, a.intrigue());
             }
         }
-        for (Council council : councils.councils()) {
+        for (Council council : councils.allCouncils().values()) {
             if (council.spymaster != Constants.NONE_ID) {
                 intrigue.put(council.ruler, intrigue.getOrDefault(council.ruler, 8) + 2);
             }

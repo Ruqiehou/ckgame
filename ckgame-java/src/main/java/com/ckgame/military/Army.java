@@ -1,56 +1,102 @@
 package com.ckgame.military;
 
-import com.ckgame.core.Constants;
-import com.ckgame.world.Character;
-import com.ckgame.world.County;
-import com.ckgame.world.Title;
-
 import java.util.ArrayList;
 import java.util.List;
 
-/** 军团：军队实体，包含部队和征兵。 */
 public final class Army {
     public int id;
+    public int owner;
     public int commander;
-    public int size = 0;
-    public String name = "";
-    public int morale = 60;
-    public int discipline = 50;
-    public int training = 0;
-    public List<Integer> troops = new ArrayList<>(); // troop types
-    public int siegeProgress = 0;
-    public int siegeTarget = 0;
-    public boolean isSieging = false;
+    public String name;
+    public int location;
+    public ArmyStatus status = ArmyStatus.IDLE;
+    public final List<UnitStack> stacks = new ArrayList<>();
+    public final List<Integer> path = new ArrayList<>();
     public int supply = 100;
+    public int morale = 100;
 
-    public Army(int id, int commander, String name) {
+    public Army(int id, int owner, String name, int location, int commander) {
         this.id = id;
-        this.commander = commander;
+        this.owner = owner;
         this.name = name;
+        this.location = location;
+        this.commander = commander;
     }
 
-    public static Army newArmy(int armyId, int commander, String name) {
-        Army a = new Army(armyId, commander, name);
-        return a;
+    public boolean isActive() {
+        return status != ArmyStatus.DISBANDED && totalMen() > 0;
     }
 
-    public void addTroop(int type, int count) {
-        // type 0=levy, 1=knight, 2=archer, etc.
-        troops.add(type);
-        size += count;
+    public int totalMen() {
+        int total = 0;
+        for (UnitStack stack : stacks) {
+            total += Math.max(0, stack.men);
+        }
+        return total;
     }
 
-    public void moveTo(int countyId) {
-        // 移动逻辑
-        this.supply = Math.max(0, supply - 5);
+    public void addMen(UnitType unitType, int men) {
+        if (unitType == null || men <= 0) {
+            return;
+        }
+        for (UnitStack stack : stacks) {
+            if (stack.unitType == unitType) {
+                stack.men += men;
+                stack.maxMen += men;
+                return;
+            }
+        }
+        stacks.add(new UnitStack(unitType, men, men));
     }
 
-    public boolean canEngage() {
-        return size > 0 && morale > 0;
+    public double monthlyMaintenance() {
+        double total = 0.0;
+        for (UnitStack stack : stacks) {
+            total += stack.men * stack.unitType.maintenance();
+        }
+        return total;
     }
 
-    public void updateMorale() {
-        if (supply < 50) morale -= 2;
-        else if (supply > 150) morale += 1;
+    public void setPath(List<Integer> newPath) {
+        path.clear();
+        if (newPath == null || newPath.isEmpty()) {
+            status = ArmyStatus.IDLE;
+            return;
+        }
+        path.addAll(newPath);
+        if (!path.isEmpty() && path.get(0) == location) {
+            path.remove(0);
+        }
+        status = path.isEmpty() ? ArmyStatus.IDLE : ArmyStatus.MOVING;
+    }
+
+    public void advanceMove(double moveChance) {
+        if ((status != ArmyStatus.MOVING && status != ArmyStatus.RETREATING) || path.isEmpty()) {
+            return;
+        }
+        if (moveChance < 1.0 && Math.random() > Math.max(0.0, moveChance)) {
+            return;
+        }
+        location = path.remove(0);
+        if (status == ArmyStatus.RETREATING && !path.isEmpty()) {
+            return;
+        }
+        status = path.isEmpty() ? ArmyStatus.IDLE : ArmyStatus.MOVING;
+    }
+
+    public void applySupplyTick(boolean inFriendlyCounty, boolean winter) {
+        int delta = inFriendlyCounty ? 5 : -8;
+        if (winter) {
+            delta -= 4;
+        }
+        supply = Math.max(0, Math.min(150, supply + delta));
+        if (supply < 30) {
+            morale = Math.max(10, morale - 3);
+        } else if (supply > 80) {
+            morale = Math.min(100, morale + 1);
+        }
+        if (totalMen() <= 0) {
+            status = ArmyStatus.DISBANDED;
+        }
     }
 }
