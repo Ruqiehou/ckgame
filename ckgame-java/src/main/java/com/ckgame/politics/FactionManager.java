@@ -201,4 +201,49 @@ public final class FactionManager {
                                   FactionKind factionKind, List<Integer> members, String reason) {
         return new FactionEvent(kind, factionId, liege, founder, who, factionKind, members, reason);
     }
+
+    /** 序列化派系状态（供存档使用）。 */
+    public Map<String, Object> saveState() {
+        Map<String, Object> s = new HashMap<>();
+        s.put("nextId", nextId);
+        Map<String, Object> fm = new HashMap<>();
+        for (var e : factions.entrySet()) {
+            Faction f = e.getValue();
+            Map<String, Object> m = new HashMap<>();
+            m.put("kind", f.kind.name());
+            m.put("targetLiege", f.targetLiege);
+            m.put("members", new ArrayList<>(f.members));
+            m.put("power", f.power);
+            m.put("discontent", f.discontent);
+            m.put("ultimatumSent", f.ultimatumSent);
+            m.put("claimant", f.claimant);
+            fm.put(String.valueOf(e.getKey()), m);
+        }
+        s.put("factions", fm);
+        return s;
+    }
+
+    /** 从存档恢复派系状态。 */
+    @SuppressWarnings("unchecked")
+    public void loadState(Map<String, Object> s) {
+        factions.clear();
+        nextId = ((Number) s.getOrDefault("nextId", 1)).intValue();
+        Map<String, Object> fm = (Map<String, Object>) s.get("factions");
+        if (fm != null) {
+            for (var e : fm.entrySet()) {
+                int id = Integer.parseInt(e.getKey());
+                Map<String, Object> m = (Map<String, Object>) e.getValue();
+                FactionKind kind = FactionKind.valueOf((String) m.get("kind"));
+                int liege = ((Number) m.get("targetLiege")).intValue();
+                Object cl = m.get("claimant");
+                Integer claimant = cl instanceof Number ? ((Number) cl).intValue() : null;
+                Faction f = new Faction(id, kind, liege, claimant);
+                f.members.addAll((List<Integer>) m.get("members"));
+                f.power = ((Number) m.get("power")).doubleValue();
+                f.discontent = ((Number) m.get("discontent")).doubleValue();
+                f.ultimatumSent = Boolean.TRUE.equals(m.get("ultimatumSent"));
+                factions.put(id, f);
+            }
+        }
+    }
 }

@@ -74,6 +74,11 @@ public final class Diplomacy {
         treaties.add(new Treaty(a, b, TreatyKind.ALLIANCE, date, date.year() + 50));
     }
 
+    /** 添加任意条约到内部列表。 */
+    public void addTreaty(Treaty treaty) {
+        treaties.add(treaty);
+    }
+
     /** 设置双方交战状态；开战时自动解除同盟与互不侵犯。 */
     public void setAtWar(int a, int b, boolean atWar) {
         DiplomacyFlags f = flagsMut(a, b);
@@ -211,6 +216,132 @@ public final class Diplomacy {
     /** 计算赠礼带来的好感度收益。 */
     public static int giftOpinionGain(double amount) {
         return (int) Math.max(1.0, Math.min(30.0, amount / 5.0));
+    }
+
+    /** 序列化外交状态（供存档使用）。 */
+    public Map<String, Object> saveState() {
+        Map<String, Object> s = new HashMap<>();
+        List<Map<String, Object>> rels = new ArrayList<>();
+        for (var e : relations.entrySet()) {
+            Map<String, Object> r = new HashMap<>();
+            r.put("a", e.getKey().a());
+            r.put("b", e.getKey().b());
+            DiplomacyFlags f = e.getValue();
+            r.put("allied", f.allied);
+            r.put("atWar", f.atWar);
+            r.put("nonAggression", f.nonAggression);
+            r.put("rival", f.rival);
+            r.put("marriagePact", f.marriagePact);
+            r.put("vassalage", f.vassalage);
+            r.put("tradeAgreement", f.tradeAgreement);
+            r.put("intelligenceSharing", f.intelligenceSharing);
+            rels.add(r);
+        }
+        s.put("relations", rels);
+        List<Map<String, Object>> ts = new ArrayList<>();
+        for (Treaty t : treaties) {
+            Map<String, Object> tm = new HashMap<>();
+            tm.put("a", t.a);
+            tm.put("b", t.b);
+            tm.put("kind", t.kind.name());
+            tm.put("startYear", t.start.year());
+            tm.put("startMonth", t.start.month());
+            tm.put("startDay", t.start.day());
+            tm.put("expiresYear", t.expiresYear);
+            ts.add(tm);
+        }
+        s.put("treaties", ts);
+        Map<String, Object> cl = new HashMap<>();
+        for (var e : claims.entrySet()) {
+            List<Map<String, Object>> clList = new ArrayList<>();
+            for (Claim c : e.getValue()) {
+                Map<String, Object> cm = new HashMap<>();
+                cm.put("claimant", c.claimant);
+                cm.put("title", c.title);
+                cm.put("county", c.county);
+                cm.put("pressed", c.pressed);
+                cm.put("strength", c.strength);
+                clList.add(cm);
+            }
+            cl.put(String.valueOf(e.getKey()), clList);
+        }
+        s.put("claims", cl);
+        Map<String, Integer> tr = new HashMap<>();
+        for (var e : truceUntil.entrySet()) {
+            tr.put(e.getKey().a() + "|" + e.getKey().b(), e.getValue());
+        }
+        s.put("truceUntil", tr);
+        s.put("warExhaustion", new HashMap<>(warExhaustion));
+        return s;
+    }
+
+    /** 从存档恢复外交状态。 */
+    @SuppressWarnings("unchecked")
+    public void loadState(Map<String, Object> s) {
+        relations.clear();
+        treaties.clear();
+        claims.clear();
+        truceUntil.clear();
+        warExhaustion.clear();
+        List<Map<String, Object>> rels = (List<Map<String, Object>>) s.get("relations");
+        if (rels != null) {
+            for (Map<String, Object> r : rels) {
+                int a = ((Number) r.get("a")).intValue();
+                int b = ((Number) r.get("b")).intValue();
+                DiplomacyFlags f = flagsMut(a, b);
+                f.allied = Boolean.TRUE.equals(r.get("allied"));
+                f.atWar = Boolean.TRUE.equals(r.get("atWar"));
+                f.nonAggression = Boolean.TRUE.equals(r.get("nonAggression"));
+                f.rival = Boolean.TRUE.equals(r.get("rival"));
+                f.marriagePact = Boolean.TRUE.equals(r.get("marriagePact"));
+                f.vassalage = Boolean.TRUE.equals(r.get("vassalage"));
+                f.tradeAgreement = Boolean.TRUE.equals(r.get("tradeAgreement"));
+                f.intelligenceSharing = Boolean.TRUE.equals(r.get("intelligenceSharing"));
+            }
+        }
+        List<Map<String, Object>> ts = (List<Map<String, Object>>) s.get("treaties");
+        if (ts != null) {
+            for (Map<String, Object> tm : ts) {
+                int a = ((Number) tm.get("a")).intValue();
+                int b = ((Number) tm.get("b")).intValue();
+                TreatyKind kind = TreatyKind.valueOf((String) tm.get("kind"));
+                GameDate start = new GameDate(
+                        ((Number) tm.get("startYear")).intValue(),
+                        ((Number) tm.get("startMonth")).intValue(),
+                        ((Number) tm.get("startDay")).intValue());
+                int exp = ((Number) tm.get("expiresYear")).intValue();
+                treaties.add(new Treaty(a, b, kind, start, exp));
+            }
+        }
+        Map<String, Object> cl = (Map<String, Object>) s.get("claims");
+        if (cl != null) {
+            for (var e : cl.entrySet()) {
+                int claimant = Integer.parseInt(e.getKey());
+                List<Map<String, Object>> clList = (List<Map<String, Object>>) e.getValue();
+                for (Map<String, Object> cm : clList) {
+                    int title = ((Number) cm.get("title")).intValue();
+                    Object countyObj = cm.get("county");
+                    Integer county = countyObj instanceof Number ? ((Number) countyObj).intValue() : null;
+                    int strength = ((Number) cm.get("strength")).intValue();
+                    addClaim(claimant, title, county, strength);
+                }
+            }
+        }
+        Map<String, Object> tr = (Map<String, Object>) s.get("truceUntil");
+        if (tr != null) {
+            for (var e : tr.entrySet()) {
+                String[] parts = e.getKey().split("\\|");
+                int a = Integer.parseInt(parts[0]);
+                int b = Integer.parseInt(parts[1]);
+                truceUntil.put(pairKey(a, b), ((Number) e.getValue()).intValue());
+            }
+        }
+        Map<String, Object> we = (Map<String, Object>) s.get("warExhaustion");
+        if (we != null) {
+            for (var e : we.entrySet()) {
+                warExhaustion.put(Integer.parseInt(e.getKey()), ((Number) e.getValue()).doubleValue());
+            }
+        }
     }
 
     private record RelationKey(int a, int b) {

@@ -26,8 +26,8 @@ public final class BattleSimulator {
                                        double terrainWidth,
                                        Random rng, double seasonMod) {
         Random r = rng != null ? rng : new Random();
-        double atkPow = attacker.combatPower() * (1.0 + (atkMartial - 8) * 0.04);
-        double defPow = defender.combatPower() * (1.0 + (defMartial - 8) * 0.04);
+        double atkPow = computePower(attacker) * (1.0 + (atkMartial - 8) * 0.04);
+        double defPow = computePower(defender) * (1.0 + (defMartial - 8) * 0.04);
 
         // 季节修正：冬季/秋季略降总体战力，冬季防守方略优
         seasonMod = Math.max(0.7, Math.min(1.15, seasonMod));
@@ -90,7 +90,16 @@ public final class BattleSimulator {
             killed += k;
             remaining -= k;
         }
-        army.morale = Math.max(10.0, army.morale - 15.0);
+        army.morale = Math.max(10, (int)(army.morale - 15.0));
         return killed;
+    }
+
+    /** 计算军队总战力（各兵种堆叠战力之和）。 */
+    private static double computePower(Army army) {
+        double total = 0.0;
+        for (UnitStack s : army.stacks) {
+            total += s.combatPower();
+        }
+        return total;
     }
 }

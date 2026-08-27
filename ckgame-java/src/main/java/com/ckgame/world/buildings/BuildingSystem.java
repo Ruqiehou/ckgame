@@ -68,4 +68,37 @@ public final class BuildingSystem {
     private static void add(Map<String, Double> m, String key, double v) {
         m.put(key, m.get(key) + v);
     }
+
+    /** 序列化建筑状态（供存档使用）。 */
+    public Map<String, Object> saveState() {
+        Map<String, Object> s = new HashMap<>();
+        for (var e : buildings.entrySet()) {
+            List<Map<String, Object>> bl = new ArrayList<>();
+            for (CountyBuilding b : e.getValue()) {
+                Map<String, Object> bm = new HashMap<>();
+                bm.put("kind", b.kind.name());
+                bm.put("level", b.level);
+                bl.add(bm);
+            }
+            s.put(String.valueOf(e.getKey()), bl);
+        }
+        return s;
+    }
+
+    /** 从存档恢复建筑状态。 */
+    @SuppressWarnings("unchecked")
+    public void loadState(Map<String, Object> s) {
+        buildings.clear();
+        for (var e : s.entrySet()) {
+            int countyId = Integer.parseInt(e.getKey());
+            List<Map<String, Object>> bl = (List<Map<String, Object>>) e.getValue();
+            List<CountyBuilding> list = new ArrayList<>();
+            for (Map<String, Object> bm : bl) {
+                BuildingKind kind = BuildingKind.valueOf((String) bm.get("kind"));
+                int level = ((Number) bm.get("level")).intValue();
+                list.add(new CountyBuilding(kind, level));
+            }
+            buildings.put(countyId, list);
+        }
+    }
 }

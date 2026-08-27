@@ -103,4 +103,52 @@ public final class SchemeManager {
         }
         return outcomes;
     }
+
+    /** 序列化阴谋状态（供存档使用）。 */
+    public Map<String, Object> saveState() {
+        Map<String, Object> s = new HashMap<>();
+        s.put("nextId", nextId);
+        List<Map<String, Object>> sl = new ArrayList<>();
+        for (Scheme sc : schemes.values()) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", sc.id);
+            m.put("kind", sc.kind.name());
+            m.put("owner", sc.owner);
+            m.put("target", sc.target);
+            m.put("progress", sc.progress);
+            m.put("secrecy", sc.secrecy);
+            m.put("agents", new ArrayList<>(sc.agents));
+            m.put("started", sc.started != null ? List.of(sc.started.year(), sc.started.month(), sc.started.day()) : null);
+            m.put("exposed", sc.exposed);
+            sl.add(m);
+        }
+        s.put("schemes", sl);
+        return s;
+    }
+
+    /** 从存档恢复阴谋状态。 */
+    @SuppressWarnings("unchecked")
+    public void loadState(Map<String, Object> s) {
+        schemes.clear();
+        nextId = ((Number) s.getOrDefault("nextId", 1)).intValue();
+        List<Map<String, Object>> sl = (List<Map<String, Object>>) s.get("schemes");
+        if (sl != null) {
+            for (Map<String, Object> m : sl) {
+                int id = ((Number) m.get("id")).intValue();
+                SchemeKind kind = SchemeKind.valueOf((String) m.get("kind"));
+                Scheme sc = new Scheme(id, kind, ((Number) m.get("owner")).intValue(),
+                        ((Number) m.get("target")).intValue());
+                sc.progress = ((Number) m.get("progress")).doubleValue();
+                sc.secrecy = ((Number) m.get("secrecy")).doubleValue();
+                sc.agents.addAll((List<Integer>) m.get("agents"));
+                List<Object> sd = (List<Object>) m.get("started");
+                if (sd != null) {
+                    sc.started = new GameDate(((Number) sd.get(0)).intValue(),
+                            ((Number) sd.get(1)).intValue(), ((Number) sd.get(2)).intValue());
+                }
+                sc.exposed = Boolean.TRUE.equals(m.get("exposed"));
+                schemes.put(id, sc);
+            }
+        }
+    }
 }
