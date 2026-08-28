@@ -17,7 +17,7 @@ go run .
 ## 版本特性
 
 - 标准库实现，无运行时依赖
-- termbox-go 实现 TUI 界面
-- go-runewidth 用于终端宽度计算
-- 主入口：main.go（待实现）
+- 主入口：`main.go`，命令行演示（加载 1066 场景、打印世界概况、AI 集结、推进数月）
+- 已实现：`core/` 基础模块（日期、季节、属性、特性、平衡常量），以及 `world/` 场景加载与 `military/`、`politics/`、`events/`、`ai/` 基础模块
+- 待实现：GameSimulation 主循环、GameAPI、termbox-go TUI（依赖已在 go.mod 中预留）
 - 编译：`go build -o ckgame-go .`

@@ -4,26 +4,31 @@
 
 ```
 ckgame-go/
+  main.go        - 命令行演示入口（加载场景、推进数月）
   core/          - 基础类型、平衡常量、日期、属性、特性
-  ai/            - AI 行为与决策
-  events/        - 事件引擎与剧情
-  game/          - 模拟循环、场景加载、主入口
-  military/      - 军团、战斗、围城、战争
-  politics/      - 法律、内阁、外交、派系、阴谋
-  ui/            - GameTUI 文字界面、GameAPI、Main
-  world/         - 角色、头衔、地图、世界状态
+  ai/            - AI 行为与决策（月度集结）
+  events/        - 事件引擎（骨架）
+  military/      - 军团、宣战、白和、月度结算（战斗与围城待实现）
+  politics/      - 条约与关系（法律、内阁、派系、阴谋待实现）
+  world/         - 角色、头衔、地图、世界状态与场景加载
   go.mod
 ```
 
 ## 已实现模块
 
+- `main.go`：命令行演示入口
+- `world/world.go`：World/Dynasty/County/Title/Character 与 `LoadScenario()`（兼容 ckgame-java/ckgame-ts 的 1066.json 场景格式）
+- `military/military.go`：集结/行军/解散/宣战/白和与月度补给结算
+- `politics/politics.go`：条约缔结与关系改善
+- `events/events.go`：事件实例与决议（触发逻辑待实现）
+- `ai/ai.go`：月度集结决策（其余决策待实现）
 - `core/`：基础类型与常量
   - `balance/balance.go`：游戏平衡参数
   - `calendar/date.go`：日期与季节
   - `stats/attributeset.go`：角色属性集合
   - `traits/traits.go`：特性定义
   - `constants.go`、`gender.go`、`title_tier.go`：核心常量
-- `go.mod`：依赖 `go-runewidth`、`termbox-go`
+- `go.mod`：依赖 `go-runewidth`、`termbox-go`（为 TUI 预留，当前未引入）
 
 ## 核心流程
 
