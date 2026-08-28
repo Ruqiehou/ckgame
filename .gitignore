@@ -4,16 +4,8 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-# Node
-node_modules/
-ckgame-ts/dist/
-
 # Java
 ckgame-java/target/
-
-# Go
-ckgame-go/ckgame-go
-ckgame-go/ckgame-go.exe
 
 # 运行时存档
 saves/*.json

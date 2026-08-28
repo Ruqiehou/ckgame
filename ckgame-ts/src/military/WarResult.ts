@@ -1,9 +1,0 @@
-/**
- * War result enum.
- */
-export enum WarResult {
-  ONGOING = 'ONGOING',
-  ATTACKER_VICTORY = 'ATTACKER_VICTORY',
-  DEFENDER_VICTORY = 'DEFENDER_VICTORY',
-  WHITE_PEACE = 'WHITE_PEACE',
-}
