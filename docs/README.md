@@ -1,6 +1,6 @@
 # CKGame 文档
 
-十字军之王风格大战略模拟引擎 — 六个语言实现的统一文档，按版本分子目录存放。
+十字军之王风格大战略模拟引擎 — 四个语言实现的统一文档，按版本分子目录存放。
 
 ## 版本文档目录
 
@@ -10,8 +10,6 @@
 | Java | [java/](java/README.md) | Maven 构建 + Jackson，Java 17 |
 | TypeScript | [typescript/](typescript/README.md) | tsc 编译为 Node.js 运行 |
 | Go | [go/](go/README.md) | 标准库，termbox-go TUI，Go 1.21 |
-| C++ | [cpp/](cpp/README.md) | C++17 + CMake，无第三方依赖 |
-| Rust | [rust/](rust/README.md) | Rust 2021，chrono + serde，termion TUI |
 
 每个版本目录下包含统一结构的文档：
 
@@ -23,7 +21,7 @@
 
 ## 通用设计
 
-六个版本共享同一套机制设计：
+四个版本共享同一套机制设计：
 
 - **架构**：`GameSimulation` 主循环（按日推进、月度结算）+ `GameAPI` 统一接口（snapshot/action）
 - **界面**：均为 TUI 命令行文字对话模式
