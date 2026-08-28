@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Random;
 
@@ -597,7 +598,9 @@ public final class World {
     }
 
     public void updateExchangeRates() {
-        for (TradeRoute route : tradeRoutes) {
+        // 用 ListIterator 原位替换：贸易量下降时不能边遍历边增删，否则抛 ConcurrentModificationException
+        for (ListIterator<TradeRoute> it = tradeRoutes.listIterator(); it.hasNext(); ) {
+            TradeRoute route = it.next();
             String key = route.key();
             if (exchangeRates.containsKey(key)) {
                 double fluctuation = 0.9 + (rng.nextDouble() * 0.2);
@@ -616,8 +619,7 @@ public final class World {
                 if (rng.nextDouble() < 0.1) {
                     // 维护不足，贸易量下降
                     int newVolume = (int) Math.round(route.tradeVolume() * 0.9);
-                    tradeRoutes.remove(route);
-                    tradeRoutes.add(new TradeRoute(route.from(), route.to(), route.exchangeRate(), newVolume));
+                    it.set(new TradeRoute(route.from(), route.to(), route.exchangeRate(), newVolume));
                     pushLog("贸易路线 " + route.from() + " → " + route.to() + " 维护不足，贸易量下降");
                 }
             }
