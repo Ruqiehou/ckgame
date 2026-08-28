@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/ui/Main.js",
-    "dev": "tsc && node dist/ui/Main.js"
+    "dev": "tsc && node dist/ui/Main.js",
+    "test": "tsc && node --test \"dist/test/*.test.js\""
   },
   "devDependencies": {
     "typescript": "^5.4.0",

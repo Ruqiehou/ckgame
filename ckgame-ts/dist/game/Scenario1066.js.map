@@ -1,1 +1,0 @@
-{"version":3,"file":"Scenario1066.js","sourceRoot":"","sources":["../../src/game/Scenario1066.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,cAAc,EAAE,MAAM,qBAAqB,CAAC;AAGrD,MAAM,OAAO,YAAY;IACvB,MAAM,CAAC,KAAK;QACV,OAAO,cAAc,CAAC,YAAY,EAAE,CAAC;IACvC,CAAC;IACD,MAAM,CAAC,aAAa,CAAC,CAAS;QAC5B,OAAO,cAAc,CAAC,YAAY,CAAC,CAAC,CAAC,CAAC;IACxC,CAAC;CACF"}

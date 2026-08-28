@@ -1,7 +1,0 @@
-export declare enum TraitKind {
-    PERSONALITY = "PERSONALITY",
-    CONGENITAL = "CONGENITAL",
-    LIFESTYLE = "LIFESTYLE",
-    COMMANDER = "COMMANDER",
-    HEALTH = "HEALTH"
-}
