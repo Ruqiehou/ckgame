@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Dict, List
 
 from ck_engine.ai import AiDirector, AiPersonality
@@ -23,11 +24,22 @@ from ck_engine.politics import (
     FactionKind,
     FactionSystem,
     RealmLaw,
+    CrownAuthority,
     SchemeKind,
     SchemeSystem,
 )
 from ck_engine.world import TitleTier, World
 from ck_engine.world.buildings import BuildingSystem
+
+
+@dataclass
+class PendingUltimatum:
+    """等待君主（通常是玩家）回应的派系最后通牒。"""
+
+    faction_id: int
+    kind: FactionKind
+    liege: int
+    members: List[int]
 
 
 class GameSimulation:
@@ -44,6 +56,7 @@ class GameSimulation:
         self.storylines = StorylineSystem()
         self.realm_laws: Dict[int, RealmLaw] = {}
         self.player_ids: set = set()
+        self.pending_ultimatums: Dict[int, PendingUltimatum] = {}
         self.bootstrap()
 
     def bootstrap(self) -> None:
@@ -315,17 +328,11 @@ class GameSimulation:
                 if who:
                     self.world.push_log(f"{who.name} 加入了派系")
             elif ev.kind == "ultimatum":
-                liege = self.world.character(ev.liege)
-                text = ev.faction_kind.ultimatum_text() if ev.faction_kind else "要求"
-                if liege:
-                    self.world.push_log(
-                        f"派系向 {liege.name} 发出最后通牒：{text}（{len(ev.members)} 人）"
-                    )
-                f = self.factions.factions.get(ev.faction_id)
-                if f:
-                    f.discontent = min(100.0, f.discontent + 20)
-                    # 最后通牒已发出，等待玩家或AI决策
+                self._process_ultimatum_event(ev)
             elif ev.kind == "revolt":
+                if ev.faction_id in self.pending_ultimatums:
+                    # 最后通牒尚待回应，先不开战
+                    continue
                 liege = self.world.character(ev.liege)
                 fk = ev.faction_kind.name_zh() if ev.faction_kind else "叛乱"
                 if liege:
@@ -346,6 +353,114 @@ class GameSimulation:
                 self.factions.dissolve(ev.faction_id)
             elif ev.kind == "dissolved":
                 self.world.push_log(f"派系解散：{ev.reason}")
+
+    # ---------- 最后通牒 ----------
+    def _process_ultimatum_event(self, ev) -> None:
+        """派系发出通牒：玩家君主挂起等待回应，AI 君主立即抉择。"""
+        liege = self.world.character(ev.liege)
+        text = ev.faction_kind.ultimatum_text() if ev.faction_kind else "要求"
+        if liege:
+            self.world.push_log(
+                f"派系向 {liege.name} 发出最后通牒：{text}（{len(ev.members)} 人）"
+            )
+        f = self.factions.factions.get(ev.faction_id)
+        if not f:
+            return
+        f.discontent = min(100.0, f.discontent + 20)
+        if ev.liege in self.player_ids:
+            self.pending_ultimatums[f.id] = PendingUltimatum(
+                faction_id=f.id,
+                kind=f.kind,
+                liege=ev.liege,
+                members=list(f.members),
+            )
+        else:
+            # AI：派系实力压过君主才让步，否则拒绝开战
+            self.resolve_ultimatum(f.id, accept=f.power >= 100.0)
+
+    def resolve_ultimatum(self, faction_id: int, accept: bool) -> None:
+        """回应派系最后通牒：接受则落实诉求，拒绝则立即叛乱。"""
+        f = self.factions.factions.get(faction_id)
+        if not f:
+            self.pending_ultimatums.pop(faction_id, None)
+            raise ValueError("派系不存在或已解散")
+        if accept:
+            self._apply_ultimatum_accept(f)
+        else:
+            self._apply_ultimatum_reject(f)
+        self.pending_ultimatums.pop(faction_id, None)
+        self.factions.dissolve(faction_id)
+
+    def _apply_ultimatum_accept(self, f) -> None:
+        liege = self.world.character(f.target_liege)
+        liege_name = liege.name if liege else "?"
+        if f.kind == FactionKind.INDEPENDENCE:
+            for m in f.members:
+                char = self.world.character(m)
+                if not char:
+                    continue
+                for tid in list(char.held_titles):
+                    t = self.world.title(tid)
+                    if t and t.de_facto_liege != NONE_ID:
+                        self.world.clear_vassal_link(tid)
+            self.world.push_log(f"{liege_name} 接受了独立最后通牒，叛离的封臣获得自由")
+        elif f.kind == FactionKind.LOWER_CROWN_AUTHORITY:
+            if liege and liege.primary_title != NONE_ID:
+                title = self.world.title(liege.primary_title)
+                laws = [title.realm_law] if title else []
+                if f.target_liege in self.realm_laws:
+                    laws.append(self.realm_laws[f.target_liege])
+                for law in laws:
+                    if law.crown_authority > CrownAuthority.AUTONOMOUS:
+                        law.crown_authority = CrownAuthority(law.crown_authority - 1)
+            self.world.push_log(f"{liege_name} 接受了限制王权最后通牒，王权等级下降")
+        elif f.kind == FactionKind.CLAIMANT:
+            claimant = (
+                self.world.character(f.claimant)
+                if f.claimant not in (None, NONE_ID)
+                else None
+            )
+            if not claimant or not claimant.is_alive():
+                claimant = next(
+                    (
+                        self.world.character(m)
+                        for m in f.members
+                        if self.world.character(m) and self.world.character(m).is_alive()
+                    ),
+                    None,
+                )
+            if claimant and liege and liege.primary_title != NONE_ID:
+                self.world.grant_title(liege.primary_title, claimant.id)
+                self.world.push_log(
+                    f"{liege_name} 被废黜，{claimant.name} 在拥立派系胁迫下登位"
+                )
+            else:
+                self.world.push_log(f"{liege_name} 接受了拥立派系的诉求，但无合适人选")
+        else:  # LIBERTY / POPULAR
+            for m in f.members:
+                self.world.modify_opinion(m, f.target_liege, 25)
+            if liege:
+                liege.add_prestige(-20)
+            self.world.push_log(f"{liege_name} 接受了改革诉求，向派系成员让步")
+
+    def _apply_ultimatum_reject(self, f) -> None:
+        liege = self.world.character(f.target_liege)
+        liege_name = liege.name if liege else "?"
+        self.world.push_log(f"{liege_name} 拒绝了最后通牒！")
+        leader = f.members[0] if f.members else NONE_ID
+        cb = (
+            CasusBelli.DEPOSE_LIEGE
+            if f.kind in (FactionKind.CLAIMANT, FactionKind.POPULAR)
+            else CasusBelli.INDEPENDENCE
+        )
+        if (
+            leader != NONE_ID
+            and self.diplomacy.can_declare_war(leader, f.target_liege, self.world.date.year)
+        ):
+            self.wars.declare_war(
+                cb, leader, f.target_liege, self.world.date, f"{f.kind.name_zh()}叛乱"
+            )
+            self.diplomacy.set_at_war(leader, f.target_liege, True)
 
     def tick_schemes(self) -> None:
         intrigue = {}

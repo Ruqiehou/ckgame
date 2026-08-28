@@ -110,6 +110,13 @@ class GameTUI:
                     self._handle_event(inst)
                 self.api.sim.events.pending = [e for e in self.api.sim.events.pending if e.character in self.api.sim.player_ids]
 
+            # 处理派系最后通牒
+            for u in [
+                u for u in list(self.api.sim.pending_ultimatums.values())
+                if u.liege == self.api.player_id
+            ]:
+                self._handle_ultimatum(u)
+
             self.render("主菜单")
             self._show_main_menu()
             cmd = input("> ").strip().lower()
@@ -323,6 +330,30 @@ class GameTUI:
                 c = inst.choices[choice - 1]
                 self.api.action({"action": "resolve_event", "event_id": inst.event_id, "choice_id": c["id"]})
                 print(f"\n  你选择了：{c['text']}")
+                pause()
+                return
+            print("无效选择")
+
+    # ---------- 最后通牒 ----------
+    def _handle_ultimatum(self, u) -> None:
+        clear()
+        print("=" * 60)
+        print(f"  ⚠ 最后通牒：{u.kind.name_zh()}")
+        print("=" * 60)
+        print(f"\n  {u.kind.ultimatum_text()}")
+        print(f"  派系成员 {len(u.members)} 人")
+        print("\n  1. 接受（落实派系诉求）")
+        print("  2. 拒绝（派系将立即叛乱）")
+        while True:
+            cmd = input("\n选择 > ").strip()
+            if cmd in ("1", "2"):
+                res = self.api.action({
+                    "action": "respond_ultimatum",
+                    "faction_id": u.faction_id,
+                    "accept": cmd == "1",
+                })
+                msgs = [m for m in res.get("messages", []) if m]
+                print(f"\n  {msgs[-1] if msgs else '已回应'}")
                 pause()
                 return
             print("无效选择")
@@ -656,6 +687,11 @@ class GameTUI:
         for i, f in enumerate(factions, 1):
             tag = "⚠已发最后通牒" if f.get("ultimatum") else ""
             print(f"    {i}. {f['kind']} 成员:{f['members']} 实力:{f['power']} 不满:{f['discontent']} {tag}")
+        ultimatums = snap.get("pending_ultimatums", [])
+        if ultimatums:
+            print(f"\n  ⚠ 有 {len(ultimatums)} 份最后通牒待回应：")
+            for u in ultimatums:
+                print(f"    - {u['kind_zh']}：{u['text']}（{u['members']} 人）")
         print(f"\n  安抚需花费 25 金")
         print(f"    0. 返回")
 

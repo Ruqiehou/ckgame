@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from ck_engine.ai.personality import AiPersonality
 from ck_engine.core import NONE_ID
-from ck_engine.game.simulation import GameSimulation
+from ck_engine.game.simulation import GameSimulation, PendingUltimatum
 from ck_engine.military.army import ArmyStatus, UnitType
 from ck_engine.politics.council import CouncilPosition, CouncilTask
 from ck_engine.politics.diplomacy import CasusBelli, TreatyKind
@@ -295,6 +295,7 @@ class GameAPI:
             "armies": armies,
             "wars": wars,
             "factions": factions,
+            "pending_ultimatums": self._pending_ultimatums(),
             "rulers": rulers,
             "log": log,
             "messages": self.messages[-12:],
@@ -367,6 +368,22 @@ class GameAPI:
         return buildings
 
     # ---------- snapshot 辅助 ----------
+    def _pending_ultimatums(self) -> List[Dict[str, Any]]:
+        out = []
+        for u in self.sim.pending_ultimatums.values():
+            if u.liege != self.player_id:
+                continue
+            out.append(
+                {
+                    "faction_id": u.faction_id,
+                    "kind": u.kind.name,
+                    "kind_zh": u.kind.name_zh(),
+                    "text": u.kind.ultimatum_text(),
+                    "members": len(u.members),
+                }
+            )
+        return out
+
     def _player_schemes(self) -> List[Dict[str, Any]]:
         out = []
         for s in self.sim.schemes.schemes.values():
@@ -581,6 +598,10 @@ class GameAPI:
                 self._feast()
             elif kind == "appease_faction":
                 self._appease_faction(int(payload["faction_id"]))
+            elif kind == "respond_ultimatum":
+                self._respond_ultimatum(
+                    int(payload["faction_id"]), bool(payload.get("accept", False))
+                )
             elif kind == "white_peace":
                 self._white_peace(int(payload["war_id"]))
             elif kind == "resolve_event":
@@ -1366,6 +1387,18 @@ class GameAPI:
             self.notify(f"派系不满降至 {left.discontent:.0f}")
             self.sim.world.push_log(f"{player.name} 安抚了派系，不满下降")
 
+    def _respond_ultimatum(self, faction_id: int, accept: bool) -> None:
+        kind_name = "?"
+        f = self.sim.factions.factions.get(faction_id)
+        if f:
+            kind_name = f.kind.name_zh()
+        self.sim.resolve_ultimatum(faction_id, accept)
+        if accept:
+            self.notify(f"已接受{kind_name}的最后通牒")
+        else:
+            self.notify(f"已拒绝{kind_name}的最后通牒，叛乱爆发！")
+        self._grant_action_xp(30)
+
     def _white_peace(self, war_id: int) -> None:
         from ck_engine.military.war import WarResult
 
@@ -1532,6 +1565,13 @@ class GameAPI:
                     "members": list(f.members), "power": f.power, "discontent": f.discontent,
                 }
                 for f in sim.factions.factions.values()
+            ],
+            "pending_ultimatums": [
+                {
+                    "faction_id": u.faction_id, "kind": u.kind.name,
+                    "liege": u.liege, "members": list(u.members),
+                }
+                for u in sim.pending_ultimatums.values()
             ],
             "schemes": [
                 {
@@ -1713,6 +1753,15 @@ class GameAPI:
             )
             sim.factions.factions[faction.id] = faction
             sim.factions.next_id = max(sim.factions.next_id, faction.id + 1)
+
+        # 恢复待回应的最后通牒
+        sim.pending_ultimatums.clear()
+        for row in data.get("pending_ultimatums", []):
+            u = PendingUltimatum(
+                faction_id=row["faction_id"], kind=FactionKind[row["kind"]],
+                liege=row["liege"], members=list(row["members"]),
+            )
+            sim.pending_ultimatums[u.faction_id] = u
 
         # 恢复阴谋
         sim.schemes.schemes.clear()
