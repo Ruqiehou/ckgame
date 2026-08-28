@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum, IntEnum, auto
 from typing import List, Optional, Sequence, Tuple
 
-from ck_engine.world.character import Gender
+from ck_engine.core.gender import Gender
 
 
 class SuccessionLaw(Enum):

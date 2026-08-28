@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Node
+node_modules/
+ckgame-ts/dist/
+
+# Java
+ckgame-java/target/
+
+# Go
+ckgame-go/ckgame-go
+ckgame-go/ckgame-go.exe
+
+# 运行时存档
+saves/*.json
+ck_engine/saves/*.json
+
+# IDE / 系统
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store

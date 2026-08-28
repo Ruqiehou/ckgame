@@ -5,11 +5,7 @@ from enum import Enum, auto
 from typing import Dict, List, Optional
 
 from ck_engine.core import NONE_ID, AttributeSet, GameDate
-
-
-class Gender(Enum):
-    MALE = auto()
-    FEMALE = auto()
+from ck_engine.core.gender import Gender
 
 
 class LifeState(Enum):
