@@ -10,15 +10,15 @@
 - 外交：结盟、互不侵犯、附庸、贸易协定、情报共享、联姻、赠礼、宿敌、邀请入宫廷、宴会、决斗
 - 系统：推进时间、切换角色、存档管理、作弊开关
 
-事件弹出时由 TUI 展示选项并调用 `resolve_event` 处理。
+事件弹出时由 TUI 展示选项并调用 `resolve_event` 处理；派系最后通牒挂起时由 TUI 弹出接受/拒绝菜单，调用 `respond_ultimatum` 处理。
 
 ## GameAPI 接口
 
-[ui/api.py](../../ck_engine/ui/api.py) 提供统一操作入口与状态快照。
+[ui/api.py](../../ck_engine/ui/api.py) 提供统一操作入口与状态快照。按职责拆分为三个 Mixin：`ui/snapshot.py`（快照构建）、`ui/savegame.py`（存档/读档）、`ui/diplomacy_actions.py`（外交操作）。
 
 ### 状态
 
-- `snapshot()`：返回完整游戏快照，包含 `player`、`date`、`season`、`characters`、`counties`、`armies`、`wars`、`claims`、`treaties`、`pending_events`、`log` 等字段。
+- `snapshot()`：返回完整游戏快照，包含 `player`、`date`、`season`、`characters`、`counties`、`armies`、`wars`、`claims`、`treaties`、`pending_events`、`pending_ultimatums`、`log` 等字段。
 
 ### 操作
 
@@ -47,6 +47,8 @@
 - `set_player`：切换玩家
 - `toggle_cheat`：作弊开关
 - `resolve_event`：处理弹出事件
+- `respond_ultimatum`：回应派系最后通牒（`{"action": "respond_ultimatum", "faction_id": 1, "accept": true}`；接受则落实诉求，拒绝则立即叛乱）
+- `appease_faction`：安抚派系
 
 ## 地图
 

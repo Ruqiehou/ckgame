@@ -21,6 +21,15 @@ npm start
 npm run dev
 ```
 
+## 测试
+
+```bash
+npm test
+```
+
+（先 `tsc` 编译，再用 Node 内置 test runner 运行 `src/test/` 下的用例）
+覆盖：日期算术、1066 场景加载不变量、`GameSimulation` 主循环稳定性。
+
 ## 项目配置
 
 - `tsconfig.json`：TypeScript 编译配置

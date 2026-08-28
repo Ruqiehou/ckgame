@@ -18,9 +18,18 @@ java -jar target/ck-game.jar
 mvn exec:java -Dexec.mainClass="com.ckgame.ui.Main"
 ```
 
+## 测试
+
+```bash
+mvn test
+```
+
+覆盖：`GameDate` 日期算术、1066 场景加载不变量、`GameSimulation` 主循环稳定性（JUnit 5，位于 `src/test/java`）。
+
 ## 项目依赖
 
 - Jackson Databind 2.17.0（JSON 处理）
+- JUnit Jupiter 5.10.2（测试，scope: test）
 
 ## 代码结构
 

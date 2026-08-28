@@ -23,6 +23,14 @@ go build -o ckgame-go .
 go install .
 ```
 
+## 测试
+
+```bash
+go test ./...
+```
+
+覆盖：`core/calendar` 日期算术（跨月/闰月/季节/年龄）、`world` 场景加载（授衔/婚姻/宗主链、真实 1066.json 回归）。
+
 ## 项目结构
 
 包结构按功能划分：

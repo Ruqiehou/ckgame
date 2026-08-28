@@ -17,6 +17,10 @@ python -m ck_engine.game.tui
 python -m pytest tests/ -v
 ```
 
+（无 pytest 时可用标准库运行：`python -m unittest discover -s tests -v`）
+
+覆盖：1066 场景构建不变量、主循环稳定性（按日/按月推进）、存档读档往返、派系最后通牒接受/拒绝闭环。
+
 ## 打包
 
 使用 PyInstaller 打包为独立可执行文件：
