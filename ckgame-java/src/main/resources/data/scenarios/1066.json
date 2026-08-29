@@ -1,4 +1,5 @@
 {
+  "meta": {"name": "1066 英格兰", "description": "诺曼征服前夜：哈罗德 vs 威廉"},
   "start_date": [1066, 1, 1],
   "dynasties": [
     {"key": "godwin", "name": "戈德温", "color": [200, 50, 50], "motto": "天佑英格兰"},

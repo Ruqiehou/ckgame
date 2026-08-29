@@ -71,9 +71,15 @@ public final class GameSimulation {
     public final StorylineSystem storylines;
     public final Map<Integer, RealmLaw> realmLaws = new HashMap<>();
     public final Set<Integer> playerIds = new HashSet<>();
+    public String scenarioId;
 
     public GameSimulation() {
-        this.world = Scenario1066.build();
+        this(null);
+    }
+
+    public GameSimulation(String scenario) {
+        this.scenarioId = ScenarioLoader.resolve(scenario);
+        this.world = ScenarioLoader.loadScenario(this.scenarioId);
         this.wars = new WarManager();
         this.sieges = new SiegeManager();
         this.events = new EventEngine();

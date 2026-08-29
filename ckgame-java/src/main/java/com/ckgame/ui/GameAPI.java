@@ -1063,14 +1063,15 @@ public final class GameAPI {
         notify("已删除存档 " + slotName);
     }
 
-    private void doNewGame() {
-        this.sim = new GameSimulation();
+    private void doNewGame(Object scenario) {
+        String sc = scenario != null ? scenario.toString() : this.sim.scenarioId;
+        this.sim = new GameSimulation(sc);
         this.playerId = defaultPlayer();
         syncPlayer();
         selectedCounty = -1;
         selectedArmy = -1;
         messages.clear();
-        messages.add("新局开始。");
+        messages.add("新局开始（场景：" + this.sim.scenarioId + "）。");
     }
 
     // ─────────────────── snapshot 辅助 ───────────────────

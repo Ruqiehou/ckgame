@@ -31,17 +31,86 @@ import java.util.Map;
  */
 public final class ScenarioLoader {
 
-    /** 默认场景数据的 classpath 资源路径。 */
-    public static final String DEFAULT_RESOURCE = "/data/scenarios/1066.json";
+    /** 默认场景 id。 */
+    public static final String DEFAULT_SCENARIO = "1066";
+
+    /** 场景资源的 classpath 目录。 */
+    public static final String RESOURCE_DIR = "/data/scenarios";
 
     private ScenarioLoader() {}
+
+    /** 场景摘要信息（供选场景菜单显示）。 */
+    public static final class ScenarioInfo {
+        public String id;
+        public String name;
+        public String description = "";
+    }
+
+    /** 场景 id 对应的 classpath 资源路径。 */
+    public static String resourceFor(String scenarioId) {
+        return RESOURCE_DIR + "/" + scenarioId + ".json";
+    }
+
+    /**
+     * 解析场景标识：
+     * - null/空白 → 默认场景 id
+     * - 存在的文件系统路径 → 原样返回（按文件加载）
+     * - 其他 → 视为场景 id（按 classpath 资源加载）
+     */
+    public static String resolve(String scenario) {
+        if (scenario == null || scenario.isBlank()) {
+            return DEFAULT_SCENARIO;
+        }
+        return scenario;
+    }
+
+    /** 判断标识是否为文件系统路径（存在则以文件方式加载）。 */
+    private static boolean isFilePath(String scenario) {
+        return scenario.endsWith(".json") || Files.exists(Path.of(scenario));
+    }
+
+    /** 列出可选场景（classpath 资源目录为文件系统时可直接枚举）。 */
+    public static List<ScenarioInfo> listScenarios() {
+        ObjectMapper mapper = new ObjectMapper();
+        List<ScenarioInfo> result = new ArrayList<>();
+        try {
+            java.net.URL url = ScenarioLoader.class.getResource(RESOURCE_DIR);
+            if (url != null && "file".equals(url.getProtocol())) {
+                Path dir = Path.of(url.toURI());
+                try (var stream = Files.list(dir)) {
+                    for (Path p : stream.filter(f -> f.toString().endsWith(".json")).sorted().toList()) {
+                        ScenarioInfo info = new ScenarioInfo();
+                        info.id = p.getFileName().toString().replace(".json", "");
+                        info.name = info.id;
+                        try {
+                            JsonNode meta = mapper.readTree(p.toFile()).path("meta");
+                            info.name = meta.path("name").asText(info.id);
+                            info.description = meta.path("description").asText("");
+                        } catch (IOException ignored) {
+                            // 无 meta 时用文件名
+                        }
+                        result.add(info);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // 打包成 jar 后无法枚举资源目录，退回默认场景
+        }
+        if (result.isEmpty()) {
+            ScenarioInfo info = new ScenarioInfo();
+            info.id = DEFAULT_SCENARIO;
+            info.name = DEFAULT_SCENARIO;
+            result.add(info);
+        }
+        return result;
+    }
 
     /** JSON 数组 [year, month, day] 转 GameDate。 */
     private static GameDate date(JsonNode arr) {
         return new GameDate(arr.get(0).asInt(), arr.get(1).asInt(), arr.get(2).asInt());
     }
 
-    /** 加载默认 1066 场景（从 classpath 资源读取）。 */
+    /** 加载默认场景（从 classpath 资源读取）。 */
     public static World loadScenario() {
         return loadScenario(null);
     }
@@ -49,21 +118,22 @@ public final class ScenarioLoader {
     /**
      * 加载场景。
      *
-     * @param path 文件系统路径；为 null/空白时优先从 classpath 资源 {@link #DEFAULT_RESOURCE} 读取
+     * @param scenario 场景 id（如 "1066"）或文件系统路径；null/空白 → 默认场景
      */
-    public static World loadScenario(String path) {
+    public static World loadScenario(String scenario) {
+        scenario = resolve(scenario);
         ObjectMapper mapper = new ObjectMapper();
         JsonNode data;
         try {
-            if (path != null && !path.isBlank()) {
-                // 支持直接传入文件系统路径
-                try (InputStream in = Files.newInputStream(Path.of(path))) {
+            if (isFilePath(scenario)) {
+                try (InputStream in = Files.newInputStream(Path.of(scenario))) {
                     data = mapper.readTree(in);
                 }
             } else {
-                InputStream in = ScenarioLoader.class.getResourceAsStream(DEFAULT_RESOURCE);
+                String resource = resourceFor(scenario);
+                InputStream in = ScenarioLoader.class.getResourceAsStream(resource);
                 if (in == null) {
-                    throw new IllegalStateException("找不到场景资源：" + DEFAULT_RESOURCE);
+                    throw new IllegalStateException("找不到场景资源：" + resource);
                 }
                 try (in) {
                     data = mapper.readTree(in);

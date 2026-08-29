@@ -158,6 +158,7 @@ public final class SaveManager {
         data.put("date", List.of(w.date.year(), w.date.month(), w.date.day()));
         data.put("tick", w.tick);
         data.put("playerId", playerId);
+        data.put("scenario", sim.scenarioId);
         data.put("playerIds", new ArrayList<>(sim.playerIds));
         data.put("world", serializeWorld(w));
         data.put("wars", serializeWars(sim.wars));
@@ -845,6 +846,10 @@ public final class SaveManager {
         GameSimulation sim = GameSimulation.reconstruct(world, wars, sieges, events,
                 factions, schemes, diplomacy, councils, buildings, storylines,
                 realmLaws, playerIds);
+        Object scenario = data.get("scenario");
+        if (scenario != null) {
+            sim.scenarioId = scenario.toString();
+        }
         lg.sim = sim;
         lg.playerId = playerIds.isEmpty() ? Constants.NONE_ID : playerIds.iterator().next();
         return lg;

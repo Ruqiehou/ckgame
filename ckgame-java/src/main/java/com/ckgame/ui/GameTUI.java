@@ -1,5 +1,7 @@
 package com.ckgame.ui;
 
+import com.ckgame.game.ScenarioLoader;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -1341,8 +1343,38 @@ public final class GameTUI {
 
     /* ──────────────────── 新游戏 ──────────────────── */
 
+    private String pickScenario() {
+        List<ScenarioLoader.ScenarioInfo> scenarios = ScenarioLoader.listScenarios();
+        System.out.println("\n  可选场景：");
+        for (int i = 0; i < scenarios.size(); i++) {
+            ScenarioLoader.ScenarioInfo s = scenarios.get(i);
+            String desc = s.description.isEmpty() ? "" : " — " + s.description;
+            System.out.println("    " + (i + 1) + ". " + s.name + " (" + s.id + ")" + desc);
+        }
+        String cur = api.simulation().scenarioId;
+        String raw = input("  选择 [回车保持当前: " + cur + "] > ").trim();
+        if (raw.isEmpty()) {
+            return cur;
+        }
+        try {
+            int idx = Integer.parseInt(raw);
+            if (idx >= 1 && idx <= scenarios.size()) {
+                return scenarios.get(idx - 1).id;
+            }
+        } catch (NumberFormatException ignored) {
+            for (ScenarioLoader.ScenarioInfo s : scenarios) {
+                if (s.id.equals(raw)) {
+                    return raw;
+                }
+            }
+        }
+        System.out.println("  无效选择，保持当前场景");
+        return cur;
+    }
+
     private void actionNewGame() {
         render("新游戏");
+        String scenario = pickScenario();
         System.out.println("\n  开始新游戏将丢失当前进度 (已有存档不受影响)。确认? (y/n)");
         String confirm = input("> ").trim().toLowerCase(Locale.ROOT);
         if (!confirm.equals("y") && !confirm.equals("yes") && !confirm.equals("是")) {
@@ -1350,8 +1382,9 @@ public final class GameTUI {
         }
         Map<String, Object> payload = new HashMap<>();
         payload.put("action", "new_game");
+        payload.put("scenario", scenario);
         api.action(payload);
-        System.out.println("\n  新局开始");
+        System.out.println("\n  新局开始（场景：" + scenario + "）");
         pause();
     }
 
