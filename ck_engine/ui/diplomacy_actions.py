@@ -262,8 +262,8 @@ class DiplomacyActionsMixin:
             raise ValueError("一方已有配偶")
         if child.betrothed_to != NONE_ID or target.betrothed_to != NONE_ID:
             raise ValueError("一方已有婚约")
-        if not child.is_adult(w.date) and not target.is_adult(w.date):
-            # 双方均未成年 → 订婚
+        if not child.is_adult(w.date) or not target.is_adult(w.date):
+            # 任一方未成年 → 订婚，双方成年后自动成婚
             child.betrothed_to = target_id
             target.betrothed_to = child_id
             dip = self.sim.diplomacy

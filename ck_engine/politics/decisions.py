@@ -102,6 +102,8 @@ class Decision:
             c.add_gold(-self.cost_gold)
         if self.cost_prestige:
             c.add_prestige(-self.cost_prestige)
+        if self.cost_piety:
+            c.piety = max(0.0, c.piety - self.cost_piety)
         for eff in self.effects:
             eff.apply(world, who)
         if self.executor:

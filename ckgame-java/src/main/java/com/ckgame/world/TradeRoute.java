@@ -1,6 +1,0 @@
-package com.ckgame.world;
-
-/** 贸易路线：起点-终点、贸易量与汇率。 */
-public record TradeRoute(String from, String to, double exchangeRate, double tradeVolume) {
-    public String key() { return from + "|" + to; }
-}
