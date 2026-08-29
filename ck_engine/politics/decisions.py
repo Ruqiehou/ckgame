@@ -243,6 +243,46 @@ def _exec_restore_empire(world, who: int) -> None:
         world.push_log(f"{c.name} 恢复帝国！「{king.name}」")
 
 
+def _primary_county(world, who: int):
+    """返回主头衔首都所在的县。"""
+    c = world.character(who)
+    if not c or c.primary_title == NONE_ID:
+        return None
+    t = world.title(c.primary_title)
+    if not t or t.capital == NONE_ID:
+        return None
+    return world.map.get(t.capital)
+
+
+def _exec_royal_progress(world, who: int) -> None:
+    """巡游领地：威望与虔诚提升，首都繁荣度提高。"""
+    c = world.character(who)
+    if not c:
+        return
+    c.add_prestige(40)
+    c.add_stress(-10)
+    county = _primary_county(world, who)
+    if county:
+        county.prosperity = min(100.0, county.prosperity + 10.0)
+        world.push_log(f"{c.name} 巡游领地，{county.name} 繁荣度提升")
+    else:
+        world.push_log(f"{c.name} 巡游领地，民众欢呼")
+
+
+def _exec_grant_charter(world, who: int) -> None:
+    """颁授特许状：授予城市自治特许状，提升首都发展度。"""
+    c = world.character(who)
+    if not c:
+        return
+    county = _primary_county(world, who)
+    if county:
+        county.development = min(
+            county.terrain.development_cap(), county.development + 2
+        )
+        c.add_prestige(15)
+        world.push_log(f"{c.name} 颁授特许状，{county.name} 发展度提升")
+
+
 BUILTIN_DECISIONS: List[Decision] = [
     Decision(
         id="declare_kingdom",
@@ -333,6 +373,30 @@ BUILTIN_DECISIONS: List[Decision] = [
         effects=[],
         log_text="帝国重建",
         executor=_exec_restore_empire,
+    ),
+    Decision(
+        id="royal_progress",
+        title="巡游领地",
+        category=DecisionCategory.COURT,
+        description="出巡你的领地，体察民情，提升威望并减轻压力。",
+        cost_gold=80,
+        cooldown_years=2,
+        min_gold=80,
+        effects=[],
+        log_text="巡游领地",
+        executor=_exec_royal_progress,
+    ),
+    Decision(
+        id="grant_charter",
+        title="颁授特许状",
+        category=DecisionCategory.TERRITORY,
+        description="授予首都城市自治特许状，促进经济发展。",
+        cost_gold=120,
+        cooldown_years=5,
+        min_gold=120,
+        effects=[],
+        log_text="颁授特许状",
+        executor=_exec_grant_charter,
     ),
 ]
 
