@@ -8,7 +8,9 @@ from typing import Dict, List
 from ck_engine.ai import AiDirector, AiPersonality
 from ck_engine.core import NONE_ID, Season
 from ck_engine.events import EventEngine
+from ck_engine.events.event_chains import ChainEngine, builtin_chains
 from ck_engine.events.storylines import StorylineSystem, builtin_storylines
+from ck_engine.politics.decisions import DecisionEngine
 from ck_engine.game.scenario_loader import DEFAULT_SCENARIO, load_scenario
 from ck_engine.military import (
     ArmyStatus,
@@ -55,6 +57,8 @@ class GameSimulation:
         self.councils = CouncilRegistry()
         self.buildings = BuildingSystem()
         self.storylines = StorylineSystem()
+        self.decisions = DecisionEngine()
+        self.chains = ChainEngine(builtin_chains())
         self.realm_laws: Dict[int, RealmLaw] = {}
         self.player_ids: set = set()
         self.pending_ultimatums: Dict[int, PendingUltimatum] = {}
@@ -196,6 +200,10 @@ class GameSimulation:
                     c.add_gold(income)
 
         self.tick_councils()
+        # 事件链推进（仅玩家君主）
+        for rid in [r.id for r in self.world.rulers()]:
+            if rid in self.player_ids:
+                self.chains.tick(self.world, rid)
         chars = [
             c.id
             for c in self.world.alive_characters()

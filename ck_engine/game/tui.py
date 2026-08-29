@@ -176,6 +176,12 @@ class GameTUI(TUIViewMixin):
                 self._show_log()
             elif cmd == "map":
                 self._show_map()
+            elif cmd == "family":
+                self._show_family_tree()
+            elif cmd == "decisions":
+                self._menu_decisions()
+            elif cmd == "chains":
+                self._show_chains()
             elif cmd == "new":
                 self._action_new_game()
             elif cmd == "player":
@@ -207,6 +213,7 @@ class GameTUI(TUIViewMixin):
         print("  improve   改善关系    feast    举办宴会    knights  招募精锐")
         print("  claim     伪造宣称    grant    授予头衔    laws    更改法律")
         print("  council   内阁管理    schemes  阴谋活动    diplomacy 外交")
+        print("  family    家族树      decisions 重大决策    chains   事件链")
         print("  player    切换玩家    new      新游戏      advance  推进时间")
         print("  save      存档        load     读档        cheat    作弊")
         print("  help      帮助        exit     退出")
@@ -1208,6 +1215,156 @@ class GameTUI(TUIViewMixin):
         res = self.api.action({"action": "load", "name": name})
         msg = res.get("messages", [""])[-1] if res.get("messages") else ""
         print(f"\n  {msg or '读档完成'}")
+        pause()
+
+    # ---------- 家族树 ----------
+    def _show_family_tree(self) -> None:
+        """显示玩家的家族树（配偶、子女、婚约）。"""
+        player = self.api.sim.world.character(self.api.player_id)
+        if not player:
+            print("  玩家无效")
+            pause()
+            return
+        clear()
+        print(f"—— 家族树：{player.name} ——")
+        print(f"  年龄：{player.age_at(self.api.sim.world.date)}  "
+              f"文化：{player.culture}  信仰：{player.faith}")
+        # 配偶
+        if player.spouses:
+            print("\n  配偶：")
+            for sid in player.spouses:
+                s = self.api.sim.world.character(sid)
+                if s:
+                    print(f"    {s.name}（{s.age_at(self.api.sim.world.date)}岁）")
+        else:
+            print("\n  配偶：无")
+        # 子女
+        if player.children:
+            print("\n  子女：")
+            for cid in player.children:
+                c = self.api.sim.world.character(cid)
+                if not c or not c.is_alive() or c.id == self.api.player_id:
+                    continue
+                status = ""
+                if c.is_married():
+                    spouse = self.api.sim.world.character(c.spouses[0])
+                    status = f" ← 已配偶{spouse.name if spouse else '?'}"
+                elif c.betrothed_to != NONE_ID:
+                    bt = self.api.sim.world.character(c.betrothed_to)
+                    status = f" ← 订婚{bt.name if bt else '?'}"
+                print(f"    {c.name}（{c.age_at(self.api.sim.world.date)}岁）{status}")
+        else:
+            print("\n  子女：无")
+        print("\n  输入子嗣编号可为其安排联姻，按回车返回。")
+        raw = input("> ").strip()
+        if not raw.isdigit():
+            pause()
+            return
+        children = [
+            cid for cid in player.children
+            if self.api.sim.world.character(cid)
+            and self.api.sim.world.character(cid).is_alive()
+            and cid != self.api.player_id
+        ]
+        if not (1 <= int(raw) <= len(children)):
+            print("  无效编号")
+            pause()
+            return
+        child_id = children[int(raw) - 1]
+        # 选择联姻对象
+        self._menu_arrange_child_marriage(child_id)
+
+    def _menu_arrange_child_marriage(self, child_id: int) -> None:
+        """为指定子嗣选择联姻对象。"""
+        child = self.api.sim.world.character(child_id)
+        if not child:
+            print("  子嗣无效")
+            pause()
+            return
+        print(f"\n  为 {child.name} 选择联姻对象：")
+        candidates = []
+        for c in self.api.sim.world.alive_characters():
+            if c.id == self.api.player_id or c.id == child_id:
+                continue
+            if not c.is_adult(self.api.sim.world.date) and c.betrothed_to == NONE_ID:
+                pass  # 允许未成年
+            if c.is_married() or c.betrothed_to != NONE_ID:
+                continue
+            if c.gender == child.gender:
+                continue
+            candidates.append(c)
+        if not candidates:
+            print("  无可选对象")
+            pause()
+            return
+        for i, c in enumerate(candidates, 1):
+            print(f"    {i}. {c.name}（{c.age_at(self.api.sim.world.date)}岁）")
+        raw = input("  选择编号（回车取消）> ").strip()
+        if not raw.isdigit():
+            pause()
+            return
+        idx = int(raw)
+        if not (1 <= idx <= len(candidates)):
+            print("  无效编号")
+            pause()
+            return
+        target_id = candidates[idx - 1].id
+        try:
+            self.api.action({"action": "arrange_child_marriage",
+                             "child_id": child_id, "target_id": target_id})
+        except ValueError as e:
+            print(f"  失败：{e}")
+            pause()
+
+    # ---------- 重大决策 ----------
+    def _menu_decisions(self) -> None:
+        """显示可执行的重大决策。"""
+        snap = self.api.snapshot()
+        decisions = snap.get("decisions", [])
+        if not decisions:
+            print("  暂无可用决策")
+            pause()
+            return
+        print("\n—— 重大决策 ——")
+        for i, d in enumerate(decisions, 1):
+            tag = "✓" if d["available"] else "✗"
+            print(f"  {i}. {tag} {d['title']}（{d['category']}）")
+            print(f"     {d['description']}")
+            if not d["available"] and d.get("reason"):
+                print(f"     前提：{d['reason']}")
+        print("\n  输入编号执行决策，0 返回。")
+        raw = input("> ").strip()
+        if raw == "0" or not raw.isdigit():
+            return
+        idx = int(raw)
+        if not (1 <= idx <= len(decisions)):
+            print("  无效编号")
+            pause()
+            return
+        dec = decisions[idx - 1]
+        if not dec["available"]:
+            print(f"  不可执行：{dec.get('reason', '')}")
+            pause()
+            return
+        self.api.action({"action": "execute_decision", "decision_id": dec["id"]})
+        print(f"  已执行决策「{dec['title']}」")
+        pause()
+
+    def _show_chains(self) -> None:
+        """显示活跃事件链。"""
+        snap = self.api.snapshot()
+        chains = snap.get("chains", [])
+        if not chains:
+            print("  暂无活跃事件链")
+            pause()
+            return
+        print("\n—— 事件链 ——")
+        for ch in chains:
+            print(f"  · {ch['title']}: {ch['description']}")
+            if ch.get("stages"):
+                for i, stage in enumerate(ch["stages"]):
+                    marker = "▶" if i == ch.get("current_stage", 0) else "·"
+                    print(f"    {marker} {stage['title']}")
         pause()
 
     # ---------- 作弊 ----------

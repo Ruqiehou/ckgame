@@ -228,3 +228,76 @@ class DiplomacyActionsMixin:
         else:
             self.sim.world.push_log(f"{player.name} 与 {target.name} 的决斗不分胜负")
             self.notify("决斗平局")
+
+    # ---------- 子嗣联姻 ----------
+
+    def _player_children(self) -> List:
+        """返回玩家的在世子女（按年龄从大到小）。"""
+        player = self.sim.world.character(self.player_id)
+        if not player:
+            return []
+        result = []
+        for cid in player.children:
+            c = self.sim.world.character(cid)
+            if c and c.is_alive() and c.id != self.player_id:
+                result.append(c)
+        result.sort(key=lambda c: c.age_at(self.sim.world.date), reverse=True)
+        return result
+
+    def _arrange_child_marriage(self, child_id: int, target_id: int) -> None:
+        """为子嗣安排联姻（可订婚或直接成婚）。"""
+        w = self.sim.world
+        player = w.character(self.player_id)
+        child = w.character(child_id)
+        target = w.character(target_id)
+        if not player or not child or not target:
+            raise ValueError("角色无效")
+        if child not in player.children:
+            raise ValueError("非玩家子嗣")
+        if not child.is_alive() or not target.is_alive():
+            raise ValueError("当事人已故")
+        if child.gender == target.gender:
+            raise ValueError("同性无法成婚")
+        if child.is_married() or target.is_married():
+            raise ValueError("一方已有配偶")
+        if child.betrothed_to != NONE_ID or target.betrothed_to != NONE_ID:
+            raise ValueError("一方已有婚约")
+        if not child.is_adult(w.date) and not target.is_adult(w.date):
+            # 双方均未成年 → 订婚
+            child.betrothed_to = target_id
+            target.betrothed_to = child_id
+            dip = self.sim.diplomacy
+            dip.flags_mut(self.player_id, target_id).marriage_pact = True
+            dip.treaties.append(self._make_treaty(target_id, TreatyKind.MARRIAGE_PACT, 50))
+            self.notify(f"已与 {target.name} 家族为 {child.name} 订婚")
+            w.push_log(f"{child.name} 与 {target.name} 订婚")
+        else:
+            # 至少一方成年 → 直接成婚
+            ok = w.marry(child_id, target_id)
+            if not ok:
+                raise ValueError("婚姻失败")
+            dip = self.sim.diplomacy
+            dip.flags_mut(self.player_id, target_id).marriage_pact = True
+            dip.treaties.append(self._make_treaty(target_id, TreatyKind.MARRIAGE_PACT, 50))
+            self.notify(f"{child.name} 与 {target.name} 成婚")
+            w.push_log(f"{child.name} 与 {target.name} 成婚")
+
+    def _break_engagement(self, child_id: int) -> None:
+        """解除婚约。"""
+        w = self.sim.world
+        child = w.character(child_id)
+        if not child or child.betrothed_to == NONE_ID:
+            raise ValueError("该角色无婚约")
+        target = w.character(child.betrothed_to)
+        if target:
+            target.betrothed_to = NONE_ID
+        child.betrothed_to = NONE_ID
+        dip = self.sim.diplomacy
+        dip.flags_mut(self.player_id, child.betrothed_to if target else target_id).marriage_pact = False
+        # 移除联姻协定条约
+        self.sim.diplomacy.treaties = [
+            t for t in self.sim.diplomacy.treaties
+            if t.kind != TreatyKind.MARRIAGE_PACT or t.a != self.player_id
+        ]
+        self.notify("已解除婚约")
+        w.push_log("婚约解除")

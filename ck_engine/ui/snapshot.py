@@ -280,7 +280,81 @@ class SnapshotMixin:
             "trade_routes": w.trade_routes,
             "exchange_rates": w.exchange_rates,
             "trade_events": w.trade_events,
+            "decisions": self._player_decisions(),
+            "chains": self._player_chains(),
+            "family": self._player_family(),
         }
+
+    def _player_decisions(self) -> List[Dict[str, Any]]:
+        """返回玩家可执行的决策及原因。"""
+        out = []
+        for d, reason in self.sim.decisions.available(self.sim.world, self.player_id):
+            out.append({
+                "id": d.id,
+                "title": d.title,
+                "category": d.category.name,
+                "description": d.description,
+                "available": reason == "",
+                "reason": reason if reason else None,
+                "cost_gold": d.cost_gold,
+                "cost_prestige": d.cost_prestige,
+            })
+        return out
+
+    def _player_chains(self) -> List[Dict[str, Any]]:
+        """返回活跃事件链。"""
+        out = []
+        for ch in self.sim.chains.active_chains:
+            stages = []
+            for i, s in enumerate(ch.stages):
+                stages.append({
+                    "id": s.id,
+                    "title": s.title,
+                    "description": s.description,
+                })
+            out.append({
+                "id": ch.id,
+                "title": ch.title,
+                "description": ch.description,
+                "current_stage": ch.current_stage,
+                "stages": stages,
+            })
+        return out
+
+    def _player_family(self) -> Dict[str, Any]:
+        """返回玩家家族信息。"""
+        player = self.sim.world.character(self.player_id)
+        if not player:
+            return {"spouses": [], "children": []}
+        spouses = []
+        for sid in player.spouses:
+            s = self.sim.world.character(sid)
+            if s:
+                spouses.append({
+                    "id": s.id,
+                    "name": s.name,
+                    "age": s.age_at(self.sim.world.date),
+                })
+        children = []
+        for cid in player.children:
+            c = self.sim.world.character(cid)
+            if not c or not c.is_alive() or c.id == self.player_id:
+                continue
+            status = "已配偶"
+            if c.is_married():
+                spouse = self.sim.world.character(c.spouses[0])
+                status = f"已配偶{spouse.name if spouse else '?'}"
+            elif c.betrothed_to != NONE_ID:
+                bt = self.sim.world.character(c.betrothed_to)
+                status = f"订婚{bt.name if bt else '?'}"
+            children.append({
+                "id": c.id,
+                "name": c.name,
+                "age": c.age_at(self.sim.world.date),
+                "gender": c.gender.name,
+                "status": status,
+            })
+        return {"spouses": spouses, "children": children}
 
     def _holder_color(self, holder_id: int) -> str:
         if holder_id == NONE_ID:

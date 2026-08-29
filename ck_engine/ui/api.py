@@ -163,6 +163,14 @@ class GameAPI(SnapshotMixin, SaveGameMixin, DiplomacyActionsMixin):
                 self._host_feast_for(int(payload["target_id"]))
             elif kind == "duel":
                 self._duel(int(payload["target_id"]))
+            elif kind == "arrange_child_marriage":
+                self._arrange_child_marriage(
+                    int(payload["child_id"]), int(payload["target_id"])
+                )
+            elif kind == "break_engagement":
+                self._break_engagement(int(payload["child_id"]))
+            elif kind == "execute_decision":
+                self._execute_decision(payload.get("decision_id"))
             elif kind == "appoint_council":
                 self._appoint_council(payload.get("position"), int(payload.get("character_id", NONE_ID)))
             elif kind == "assign_council_task":
@@ -263,6 +271,14 @@ class GameAPI(SnapshotMixin, SaveGameMixin, DiplomacyActionsMixin):
             self.notify(f"★ 作弊：{completed} 个阴谋已立即完成")
         else:
             self.notify("无进行中阴谋可完成")
+
+    def _execute_decision(self, decision_id: str) -> None:
+        """执行重大决策。"""
+        ok = self.sim.decisions.execute(decision_id, self.sim.world, self.player_id)
+        if ok:
+            self.notify(f"已执行决策「{decision_id}」")
+        else:
+            raise ValueError(f"决策「{decision_id}」不可执行")
 
     def _player_laws(self) -> Dict[str, Any]:
         w = self.sim.world
