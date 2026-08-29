@@ -203,7 +203,7 @@ class SaveGameMixin:
             raise ValueError("没有存档")
         data = json.loads(path.read_text(encoding="utf-8"))
         # 新开局再覆盖动态状态，保证 ID 一致
-        self.sim = GameSimulation()
+        self.sim = GameSimulation(data.get("scenario") or self.sim.scenario_id)
         w = self.sim.world
         sim = self.sim
 

@@ -127,12 +127,12 @@ class GameAPI(SnapshotMixin, SaveGameMixin, DiplomacyActionsMixin):
             elif kind == "delete_save":
                 self._delete_save(str(payload["name"]))
             elif kind == "new_game":
-                self.sim = GameSimulation()
+                self.sim = GameSimulation(payload.get("scenario") or self.sim.scenario_id)
                 self.player_id = self._default_player()
                 self._sync_player()
                 self.selected_county = None
                 self.selected_army = None
-                self.messages = ["新局开始。"]
+                self.messages = [f"新局开始（场景：{self.sim.scenario_id}）。"]
             elif kind == "set_succession_law":
                 self._set_succession_law(payload.get("law"))
             elif kind == "set_crown_authority":

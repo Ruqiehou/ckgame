@@ -43,8 +43,9 @@ class PendingUltimatum:
 
 
 class GameSimulation:
-    def __init__(self) -> None:
-        self.world: World = Scenario1066.build()
+    def __init__(self, scenario: str | None = None) -> None:
+        self.scenario_id = scenario or DEFAULT_SCENARIO
+        self.world: World = load_scenario(self.scenario_id)
         self.wars = WarManager()
         self.sieges = SiegeManager()
         self.events = EventEngine()

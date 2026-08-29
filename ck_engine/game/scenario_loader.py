@@ -14,6 +14,46 @@ BASE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
 DATA_DIR = BASE_DIR / "data" / "scenarios"
 
 
+DEFAULT_SCENARIO = "1066"
+
+
+def resolve_scenario_path(scenario: Path | str | None) -> Path:
+    """解析场景标识为 JSON 路径。
+
+    - None → 默认场景
+    - "1066" 这类短名 → data/scenarios/<name>.json
+    - 其他 → 视为文件路径
+    """
+    if scenario is None:
+        return DATA_DIR / f"{DEFAULT_SCENARIO}.json"
+    p = Path(scenario)
+    if p.suffix != ".json" and not p.exists():
+        candidate = DATA_DIR / f"{p.name}.json"
+        if candidate.exists():
+            return candidate
+    return p
+
+
+def list_scenarios() -> List[Dict[str, Any]]:
+    """列出 data/scenarios 下所有可选场景。
+
+    返回 [{"id": 文件主名, "name", "description", "path"}]；
+    JSON 顶层可选 "meta": {"name": ..., "description": ...}，缺省用文件名。
+    """
+    result: List[Dict[str, Any]] = []
+    for path in sorted(DATA_DIR.glob("*.json")):
+        name = path.stem
+        desc = ""
+        try:
+            meta = json.loads(path.read_text(encoding="utf-8")).get("meta", {})
+            name = str(meta.get("name", name))
+            desc = str(meta.get("description", ""))
+        except Exception:
+            pass
+        result.append({"id": path.stem, "name": name, "description": desc, "path": path})
+    return result
+
+
 def _date(arr: List[int]) -> GameDate:
     return GameDate(int(arr[0]), int(arr[1]), int(arr[2]))
 
@@ -31,7 +71,7 @@ def _gender(name: str) -> Gender:
 
 
 def load_scenario(path: Path | str | None = None) -> World:
-    path = Path(path) if path else DATA_DIR / "1066.json"
+    path = resolve_scenario_path(path)
     data: Dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     start = data.get("start_date", [1066, 1, 1])
     world = World(_date(start))
