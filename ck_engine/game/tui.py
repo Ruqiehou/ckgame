@@ -1271,8 +1271,21 @@ class GameTUI(TUIViewMixin):
             pause()
             return
         child_id = children[int(raw) - 1]
-        # 选择联姻对象
-        self._menu_arrange_child_marriage(child_id)
+        child = self.api.sim.world.character(child_id)
+        print("  1. 安排联姻  2. 设置教育方向  0. 返回")
+        action = input("> ").strip()
+        if action == "1":
+            self._menu_arrange_child_marriage(child_id)
+        elif action == "2" and child and not child.is_adult(self.api.sim.world.date):
+            focuses = ["diplomacy", "martial", "stewardship", "intrigue", "learning", "prowess"]
+            print("  " + "  ".join(f"{i}. {focus}" for i, focus in enumerate(focuses, 1)))
+            choice = input("> ").strip()
+            if choice.isdigit() and 1 <= int(choice) <= len(focuses):
+                self.api.action({"action": "set_child_education", "child_id": child_id,
+                                 "focus": focuses[int(choice) - 1]})
+        elif action == "2":
+            print("  成年子女无法设置教育方向")
+            pause()
 
     def _menu_arrange_child_marriage(self, child_id: int) -> None:
         """为指定子嗣选择联姻对象。"""

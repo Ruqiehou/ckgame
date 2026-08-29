@@ -70,6 +70,7 @@ class Decision:
     log_text: str = ""
     # 可选：额外的自定义前提检查（返回 (ok, reason)）
     checker: Optional[Callable] = None
+    executor: Optional[Callable] = None
 
     def can_execute(self, world, who: int) -> Tuple[bool, str]:
         c = world.character(who)
@@ -103,6 +104,8 @@ class Decision:
             c.add_prestige(-self.cost_prestige)
         for eff in self.effects:
             eff.apply(world, who)
+        if self.executor:
+            self.executor(world, who)
         if self.log_text:
             world.push_log(self.log_text)
 
@@ -249,7 +252,7 @@ BUILTIN_DECISIONS: List[Decision] = [
         effects=[DecisionEffect("log", text="加冕为王")],
         log_text="加冕为王，王朝建立",
         checker=_check_has_duchy,
-        execute=_exec_declare_kingdom,
+        executor=_exec_declare_kingdom,
     ),
     Decision(
         id="move_capital",
@@ -323,7 +326,7 @@ BUILTIN_DECISIONS: List[Decision] = [
         requires_kingdom=True,
         effects=[],
         log_text="帝国重建",
-        execute=_exec_restore_empire,
+        executor=_exec_restore_empire,
     ),
 ]
 

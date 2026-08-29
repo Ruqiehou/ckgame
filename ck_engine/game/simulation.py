@@ -203,6 +203,7 @@ class GameSimulation:
         # 事件链推进（仅玩家君主）
         for rid in [r.id for r in self.world.rulers()]:
             if rid in self.player_ids:
+                self.chains.check_triggers(self.world, rid)
                 self.chains.tick(self.world, rid)
         chars = [
             c.id
@@ -239,6 +240,28 @@ class GameSimulation:
         for r in list(self.world.rulers()):
             self.ensure_council(r.id)
             self.realm_laws.setdefault(r.id, RealmLaw.feudal_default())
+
+    def _process_family(self) -> None:
+        """结算子女教育，并让已成年的婚约双方自动成婚。"""
+        for child in list(self.world.alive_characters()):
+            if child.education_focus:
+                if child.is_adult(self.world.date):
+                    child.education_focus = ""
+                elif random.random() < 0.2:
+                    current = getattr(child.base_attrs, child.education_focus)
+                    setattr(child.base_attrs, child.education_focus, min(100, current + 1))
+
+            target_id = child.betrothed_to
+            if target_id == NONE_ID or child.id > target_id:
+                continue
+            target = self.world.character(target_id)
+            if not target or not target.is_alive() or target.betrothed_to != child.id:
+                child.betrothed_to = NONE_ID
+                continue
+            if child.is_adult(self.world.date) and target.is_adult(self.world.date):
+                child.betrothed_to = NONE_ID
+                target.betrothed_to = NONE_ID
+                self.world.marry(child.id, target.id)
 
     def tick_councils(self) -> None:
         skill_map: Dict[int, tuple] = {}

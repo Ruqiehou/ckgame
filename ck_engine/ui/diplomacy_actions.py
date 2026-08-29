@@ -282,18 +282,33 @@ class DiplomacyActionsMixin:
             self.notify(f"{child.name} 与 {target.name} 成婚")
             w.push_log(f"{child.name} 与 {target.name} 成婚")
 
+    def _set_child_education(self, child_id: int, focus: str) -> None:
+        """为未成年子女指定教育方向。"""
+        child = self.sim.world.character(child_id)
+        player = self.sim.world.character(self.player_id)
+        focuses = {"diplomacy", "martial", "stewardship", "intrigue", "learning", "prowess"}
+        if not child or not player or child_id not in player.children:
+            raise ValueError("非玩家子女")
+        if child.is_adult(self.sim.world.date):
+            raise ValueError("成年角色无法更改教育方向")
+        if focus not in focuses:
+            raise ValueError("无效教育方向")
+        child.education_focus = focus
+        self.notify(f"已为 {child.name} 选择教育方向：{focus}")
+
     def _break_engagement(self, child_id: int) -> None:
         """解除婚约。"""
         w = self.sim.world
         child = w.character(child_id)
         if not child or child.betrothed_to == NONE_ID:
             raise ValueError("该角色无婚约")
-        target = w.character(child.betrothed_to)
+        target_id = child.betrothed_to
+        target = w.character(target_id)
         if target:
             target.betrothed_to = NONE_ID
         child.betrothed_to = NONE_ID
         dip = self.sim.diplomacy
-        dip.flags_mut(self.player_id, child.betrothed_to if target else target_id).marriage_pact = False
+        dip.flags_mut(self.player_id, target_id).marriage_pact = False
         # 移除联姻协定条约
         self.sim.diplomacy.treaties = [
             t for t in self.sim.diplomacy.treaties

@@ -336,6 +336,10 @@ class SnapshotMixin:
                     "age": s.age_at(self.sim.world.date),
                 })
         children = []
+        focus_names = {
+            "diplomacy": "外交", "martial": "军略", "stewardship": "管理",
+            "intrigue": "谋略", "learning": "学识", "prowess": "勇武",
+        }
         for cid in player.children:
             c = self.sim.world.character(cid)
             if not c or not c.is_alive() or c.id == self.player_id:
@@ -353,6 +357,8 @@ class SnapshotMixin:
                 "age": c.age_at(self.sim.world.date),
                 "gender": c.gender.name,
                 "status": status,
+                "education_focus": c.education_focus or None,
+                "education_focus_name": focus_names.get(c.education_focus),
             })
         return {"spouses": spouses, "children": children}
 

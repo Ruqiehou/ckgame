@@ -261,6 +261,32 @@ def builtin_events() -> List[EventDef]:
             ],
         ),
         EventDef(
+            11,
+            "子女的求教",
+            "你的孩子在宫廷中向你请教治国之道。",
+            1.8,
+            240,
+            False,
+            [
+                choice(0, "亲自教导", [Effect("stress", 5), Effect("prestige", 8)], 8),
+                choice(1, "交给宫廷导师", [Effect("gold", -15), Effect("prestige", 4)], 6),
+            ],
+            requires_children=True,
+        ),
+        EventDef(
+            12,
+            "家族聚会",
+            "亲族齐聚宫廷，这正是维系家族感情的机会。",
+            1.2,
+            365,
+            False,
+            [
+                choice(0, "设宴款待", [Effect("gold", -20), Effect("stress", -10), Effect("prestige", 10)], 8),
+                choice(1, "简朴相聚", [Effect("stress", -5), Effect("piety", 5)], 6),
+            ],
+            requires_children=True,
+        ),
+        EventDef(
             10,
             "学者来访",
             "一位学者带来稀有抄本。",

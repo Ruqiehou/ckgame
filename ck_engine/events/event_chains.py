@@ -249,7 +249,7 @@ class ChainEngine:
 
     def __post_init__(self) -> None:
         if not self.chains:
-            self.chains = [c for c in BUILTIN_CHAINS]
+            self.chains = builtin_chains()
 
     def check_triggers(self, world, who: int) -> List[EventChain]:
         """检查并触发可触发的事件链。"""
