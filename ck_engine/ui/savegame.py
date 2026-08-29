@@ -179,6 +179,23 @@ class SaveGameMixin:
                 for s in sim.schemes.schemes.values()
                 if not s.exposed and not s.is_complete()
             ],
+            "decisions": {
+                "cooldowns": dict(sim.decisions.cooldowns),
+                "history": list(sim.decisions.history),
+            },
+            "chains": [
+                {
+                    "id": chain.id,
+                    "active": chain.active,
+                    "completed": chain.completed,
+                    "current_stage": chain.current_stage,
+                    "participants": list(chain.participants),
+                    "start_date": [chain.start_date.year, chain.start_date.month, chain.start_date.day] if chain.start_date else None,
+                    "stage_started": [chain.stage_started.year, chain.stage_started.month, chain.stage_started.day] if chain.stage_started else None,
+                }
+                for chain in sim.chains.chains
+                if chain.active or chain.completed
+            ],
             "councils": {
                 str(rid): {
                     "chancellor": c.chancellor,
@@ -367,6 +384,27 @@ class SaveGameMixin:
             scheme.exposed = bool(row.get("exposed", False))
             sim.schemes.schemes[scheme.id] = scheme
             sim.schemes.next_id = max(sim.schemes.next_id, scheme.id + 1)
+
+        # 恢复重大决策与事件链
+        decision_data = data.get("decisions", {})
+        sim.decisions.cooldowns = {
+            str(k): int(v) for k, v in decision_data.get("cooldowns", {}).items()
+        }
+        sim.decisions.history = list(decision_data.get("history", []))
+        chain_rows = {row.get("id"): row for row in data.get("chains", [])}
+        sim.chains.active_chains.clear()
+        for chain in sim.chains.chains:
+            row = chain_rows.get(chain.id)
+            if not row:
+                continue
+            chain.active = bool(row.get("active", False))
+            chain.completed = bool(row.get("completed", False))
+            chain.current_stage = min(int(row.get("current_stage", 0)), max(0, len(chain.stages) - 1))
+            chain.participants = list(row.get("participants", []))
+            chain.start_date = GameDate(*row["start_date"]) if row.get("start_date") else None
+            chain.stage_started = GameDate(*row["stage_started"]) if row.get("stage_started") else chain.start_date
+            if chain.active and not chain.completed:
+                sim.chains.active_chains.append(chain)
 
         # 恢复内阁
         sim.councils.by_ruler.clear()

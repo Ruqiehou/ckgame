@@ -36,7 +36,7 @@ from ck_engine.world.buildings import BuildingSystem
 
 @dataclass
 class PendingUltimatum:
-    """?????????????????????"""
+    """等待君主（通常是玩家）回应的派系最后通牒。"""
 
     faction_id: int
     kind: FactionKind
@@ -66,23 +66,23 @@ class GameSimulation:
 
     def bootstrap(self) -> None:
         william = next(
-            (c.id for c in self.world.alive_characters() if "??????" in c.name),
+            (c.id for c in self.world.alive_characters() if "威廉·征服者" in c.name),
             None,
         )
         harold = next(
-            (c.id for c in self.world.alive_characters() if "???" in c.name),
+            (c.id for c in self.world.alive_characters() if "哈罗德" in c.name),
             None,
         )
         if william and harold:
             self.diplomacy.set_rival(william, harold)
             eng = next(
-                (t.id for t in self.world.titles.values() if "???" in t.name),
+                (t.id for t in self.world.titles.values() if "英格兰" in t.name),
                 None,
             )
             if eng:
                 self.diplomacy.add_claim(william, eng, strength=80)
-        edwin = next((c.id for c in self.world.alive_characters() if "???" in c.name), None)
-        morcar = next((c.id for c in self.world.alive_characters() if "??" in c.name), None)
+        edwin = next((c.id for c in self.world.alive_characters() if "埃德温" in c.name), None)
+        morcar = next((c.id for c in self.world.alive_characters() if "莫卡" in c.name), None)
         if edwin and morcar:
             self.diplomacy.form_alliance(edwin, morcar, self.world.date)
         for r in list(self.world.rulers()):
@@ -135,7 +135,7 @@ class GameSimulation:
         if self.world.date.is_month_start():
             self.tick_month()
         if self.world.date.is_year_start():
-            self.world.push_log(f"?? {self.world.date.year} ??? ??")
+            self.world.push_log(f"—— {self.world.date.year} 年来临 ——")
             for line in self.diplomacy.expire_treaties(self.world.date.year, world=self.world):
                 self.world.push_log(line)
 
@@ -161,7 +161,7 @@ class GameSimulation:
     def tick_month(self) -> None:
         self.world.process_health()
 
-        # ???????????????????????????????
+        # 军队维护费：破产时强制解散部分军团（在收税前用上个月结余支付）
         by_owner: Dict[int, List] = {}
         for army in self.wars.armies.values():
             if army.is_active():
@@ -171,23 +171,23 @@ class GameSimulation:
             if not c:
                 continue
             cost = sum(a.monthly_maintenance() for a in armies)
-            # ???????????????
+            # 维护费略抬高，避免常备军无代价
             cost *= 1.25
             if c.gold >= cost:
                 c.add_gold(-cost)
                 continue
-            # ?????????????????
+            # 掏空国库并每月最多解散一支最大军团
             c.add_gold(-c.gold)
             armies.sort(key=lambda a: a.total_men(), reverse=True)
             dis = armies[0]
             dis.status = ArmyStatus.DISBANDED
             dis.stacks.clear()
-            self.world.push_log(f"{c.name} ????????? {dis.name}")
+            self.world.push_log(f"{c.name} 国库空虚，被迫解散 {dis.name}")
 
         self.world.process_monthly_economy()
         self.world.process_fertility()
 
-        # ?????????
+        # 每月给予少量经验值
         for c in self.world.alive_characters():
             c.gain_xp(5)
 
@@ -200,7 +200,7 @@ class GameSimulation:
                     c.add_gold(income)
 
         self.tick_councils()
-        # ????????????
+        # 事件链推进（仅玩家君主）
         for rid in [r.id for r in self.world.rulers()]:
             if rid in self.player_ids:
                 self.chains.check_triggers(self.world, rid)
@@ -229,7 +229,7 @@ class GameSimulation:
             self.world, self.wars, self.diplomacy, self.schemes, actions
         )
         self.tick_wars()
-        # ??????????????????
+        # 先结算战争疲劳增减，再对非交战者衰减
         at_war_ids = set()
         for w in self.wars.active_wars():
             at_war_ids.add(w.attacker_primary)
@@ -242,7 +242,7 @@ class GameSimulation:
             self.realm_laws.setdefault(r.id, RealmLaw.feudal_default())
 
     def _process_family(self) -> None:
-        """??????????????????????"""
+        """结算子女教育，并让已成年的婚约双方自动成婚。"""
         for child in list(self.world.alive_characters()):
             if child.education_focus:
                 if child.is_adult(self.world.date):
@@ -311,9 +311,9 @@ class GameSimulation:
                 )
                 if target:
                     self.diplomacy.add_claim(rid, target.owner_title, target.id, 50)
-                    self.world.push_log(f"{c.name} ???? {target.name} ???")
-            # ?????????????????????
-            if any("??????" in line for line in effect.logs):
+                    self.world.push_log(f"{c.name} 伪造了对 {target.name} 的宣称")
+            # 破坏阴谋：压低以本君主为目标的活跃阴谋进度
+            if any("破坏敌对阴谋" in line for line in effect.logs):
                 spy = council.spymaster
                 spy_skill = skill_map.get(spy, (8, 8, 8, 8, 8))[3]
                 for scheme in list(self.schemes.schemes.values()):
@@ -352,23 +352,23 @@ class GameSimulation:
             if ev.kind == "formed":
                 founder = self.world.character(ev.founder)
                 liege = self.world.character(ev.liege)
-                fk = ev.faction_kind.name_zh() if ev.faction_kind else "??"
+                fk = ev.faction_kind.name_zh() if ev.faction_kind else "派系"
                 if founder and liege:
-                    self.world.push_log(f"{founder.name} ?? {liege.name} ???{fk}")
+                    self.world.push_log(f"{founder.name} 针对 {liege.name} 组建了{fk}")
             elif ev.kind == "joined":
                 who = self.world.character(ev.who)
                 if who:
-                    self.world.push_log(f"{who.name} ?????")
+                    self.world.push_log(f"{who.name} 加入了派系")
             elif ev.kind == "ultimatum":
                 self._process_ultimatum_event(ev)
             elif ev.kind == "revolt":
                 if ev.faction_id in self.pending_ultimatums:
-                    # ?????????????
+                    # 最后通牒尚待回应，先不开战
                     continue
                 liege = self.world.character(ev.liege)
-                fk = ev.faction_kind.name_zh() if ev.faction_kind else "??"
+                fk = ev.faction_kind.name_zh() if ev.faction_kind else "叛乱"
                 if liege:
-                    self.world.push_log(f"?????{fk} vs {liege.name}")
+                    self.world.push_log(f"叛乱爆发！{fk} vs {liege.name}")
                 if ev.members:
                     leader = ev.members[0]
                     cb = (
@@ -379,21 +379,21 @@ class GameSimulation:
                     )
                     if self.diplomacy.can_declare_war(leader, ev.liege, self.world.date.year):
                         self.wars.declare_war(
-                            cb, leader, ev.liege, self.world.date, f"{fk}??"
+                            cb, leader, ev.liege, self.world.date, f"{fk}叛乱"
                         )
                         self.diplomacy.set_at_war(leader, ev.liege, True)
                 self.factions.dissolve(ev.faction_id)
             elif ev.kind == "dissolved":
-                self.world.push_log(f"?????{ev.reason}")
+                self.world.push_log(f"派系解散：{ev.reason}")
 
-    # ---------- ???? ----------
+    # ---------- 最后通牒 ----------
     def _process_ultimatum_event(self, ev) -> None:
-        """??????????????????AI ???????"""
+        """派系发出通牒：玩家君主挂起等待回应，AI 君主立即抉择。"""
         liege = self.world.character(ev.liege)
-        text = ev.faction_kind.ultimatum_text() if ev.faction_kind else "??"
+        text = ev.faction_kind.ultimatum_text() if ev.faction_kind else "要求"
         if liege:
             self.world.push_log(
-                f"??? {liege.name} ???????{text}?{len(ev.members)} ??"
+                f"派系向 {liege.name} 发出最后通牒：{text}（{len(ev.members)} 人）"
             )
         f = self.factions.factions.get(ev.faction_id)
         if not f:
@@ -407,15 +407,15 @@ class GameSimulation:
                 members=list(f.members),
             )
         else:
-            # AI???????????????????
+            # AI：派系实力压过君主才让步，否则拒绝开战
             self.resolve_ultimatum(f.id, accept=f.power >= 100.0)
 
     def resolve_ultimatum(self, faction_id: int, accept: bool) -> None:
-        """?????????????????????????"""
+        """回应派系最后通牒：接受则落实诉求，拒绝则立即叛乱。"""
         f = self.factions.factions.get(faction_id)
         if not f:
             self.pending_ultimatums.pop(faction_id, None)
-            raise ValueError("?????????")
+            raise ValueError("派系不存在或已解散")
         if accept:
             self._apply_ultimatum_accept(f)
         else:
@@ -435,7 +435,7 @@ class GameSimulation:
                     t = self.world.title(tid)
                     if t and t.de_facto_liege != NONE_ID:
                         self.world.clear_vassal_link(tid)
-            self.world.push_log(f"{liege_name} ???????????????????")
+            self.world.push_log(f"{liege_name} 接受了独立最后通牒，叛离的封臣获得自由")
         elif f.kind == FactionKind.LOWER_CROWN_AUTHORITY:
             if liege and liege.primary_title != NONE_ID:
                 title = self.world.title(liege.primary_title)
@@ -445,7 +445,7 @@ class GameSimulation:
                 for law in laws:
                     if law.crown_authority > CrownAuthority.AUTONOMOUS:
                         law.crown_authority = CrownAuthority(law.crown_authority - 1)
-            self.world.push_log(f"{liege_name} ??????????????????")
+            self.world.push_log(f"{liege_name} 接受了限制王权最后通牒，王权等级下降")
         elif f.kind == FactionKind.CLAIMANT:
             claimant = (
                 self.world.character(f.claimant)
@@ -464,21 +464,21 @@ class GameSimulation:
             if claimant and liege and liege.primary_title != NONE_ID:
                 self.world.grant_title(liege.primary_title, claimant.id)
                 self.world.push_log(
-                    f"{liege_name} ????{claimant.name} ??????????"
+                    f"{liege_name} 被废黜，{claimant.name} 在拥立派系胁迫下登位"
                 )
             else:
-                self.world.push_log(f"{liege_name} ?????????????????")
+                self.world.push_log(f"{liege_name} 接受了拥立派系的诉求，但无合适人选")
         else:  # LIBERTY / POPULAR
             for m in f.members:
                 self.world.modify_opinion(m, f.target_liege, 25)
             if liege:
                 liege.add_prestige(-20)
-            self.world.push_log(f"{liege_name} ???????????????")
+            self.world.push_log(f"{liege_name} 接受了改革诉求，向派系成员让步")
 
     def _apply_ultimatum_reject(self, f) -> None:
         liege = self.world.character(f.target_liege)
         liege_name = liege.name if liege else "?"
-        self.world.push_log(f"{liege_name} ????????")
+        self.world.push_log(f"{liege_name} 拒绝了最后通牒！")
         leader = f.members[0] if f.members else NONE_ID
         cb = (
             CasusBelli.DEPOSE_LIEGE
@@ -490,7 +490,7 @@ class GameSimulation:
             and self.diplomacy.can_declare_war(leader, f.target_liege, self.world.date.year)
         ):
             self.wars.declare_war(
-                cb, leader, f.target_liege, self.world.date, f"{f.kind.name_zh()}??"
+                cb, leader, f.target_liege, self.world.date, f"{f.kind.name_zh()}叛乱"
             )
             self.diplomacy.set_at_war(leader, f.target_liege, True)
 
@@ -512,7 +512,7 @@ class GameSimulation:
                 tn = target.name if target else "?"
                 kind = o.scheme_kind
                 if kind == SchemeKind.MURDER:
-                    self.world.push_log(f"?????{on} ??? {tn}?")
+                    self.world.push_log(f"阴谋成功：{on} 暗杀了 {tn}！")
                     target = self.world.character(o.target)
                     law = None
                     if target and target.primary_title != NONE_ID:
@@ -525,34 +525,34 @@ class GameSimulation:
                         owner.add_prestige(-15)
                 elif kind == SchemeKind.SWAY:
                     self.world.modify_opinion(o.target, o.owner, 25)
-                    self.world.push_log(f"{on} ????? {tn}")
+                    self.world.push_log(f"{on} 成功拉拢了 {tn}")
                 elif kind == SchemeKind.FABRICATE_HOOK:
                     self.world.modify_opinion(o.target, o.owner, -10)
-                    self.world.push_log(f"{on} ??? {tn} ???")
+                    self.world.push_log(f"{on} 掌握了 {tn} 的把柄")
                     if owner:
                         owner.add_prestige(10)
                 elif kind == SchemeKind.ABDUCT:
-                    self.world.push_log(f"{on} ??? {tn}")
+                    self.world.push_log(f"{on} 绑架了 {tn}")
                     if target:
                         target.add_stress(30)
                 elif kind == SchemeKind.SEDUCE:
                     self.world.modify_opinion(o.target, o.owner, 30)
-                    self.world.push_log(f"{on} ? {tn} ????")
+                    self.world.push_log(f"{on} 与 {tn} 产生私情")
                 elif kind == SchemeKind.CLAIM_FABRICATION:
-                    self.world.push_log(f"{on} ??? {tn} ???????")
+                    self.world.push_log(f"{on} 完成对 {tn} 相关宣称的伪造")
             elif o.kind == "exposed":
                 owner = self.world.character(o.owner)
                 target = self.world.character(o.target)
                 on = owner.name if owner else "?"
                 tn = target.name if target else "?"
-                self.world.push_log(f"?????{on} ? {tn} ??????")
+                self.world.push_log(f"阴谋败露！{on} 对 {tn} 的密谋被发现")
                 self.world.modify_opinion(o.target, o.owner, -40)
                 if owner:
                     owner.add_prestige(-25)
                     owner.add_stress(15)
 
     def resolve_encounters(self) -> None:
-        # ????????O(n)
+        # 按位置分组军队，O(n)
         by_loc: Dict[int, List[tuple]] = defaultdict(list)
         for a in self.wars.armies.values():
             if a.is_active():
@@ -561,7 +561,7 @@ class GameSimulation:
         for loc, loc_armies in by_loc.items():
             if len(loc_armies) < 2:
                 continue
-            # ???????owner -> [(army_id, men), ...]
+            # 按所有者分组：owner -> [(army_id, men), ...]
             by_owner: Dict[int, List[tuple]] = defaultdict(list)
             for aid, owner, men in loc_armies:
                 by_owner[owner].append((aid, men))
@@ -577,7 +577,7 @@ class GameSimulation:
                     )
                     if not enemies:
                         continue
-                    # ???????????????
+                    # 每对阵营只打最大规模的一对军队
                     a_id = max(by_owner[oa], key=lambda row: row[1])[0]
                     b_id = max(by_owner[ob], key=lambda row: row[1])[0]
                     army_a = self.wars.armies.get(a_id)
@@ -601,7 +601,7 @@ class GameSimulation:
         an = self.world.character(army_a.owner)
         bn = self.world.character(army_b.owner)
         self.world.push_log(
-            f"???{(an.name if an else '?')} vs {(bn.name if bn else '?')} ? {result.description}"
+            f"战斗！{(an.name if an else '?')} vs {(bn.name if bn else '?')} — {result.description}"
         )
         for w in list(self.wars.active_wars()):
             if w.involves(army_a.owner) and w.involves(army_b.owner):
@@ -613,13 +613,13 @@ class GameSimulation:
         self._retreat_army(loser)
 
     def _retreat_army(self, army) -> None:
-        """??????????????????????"""
+        """败军撤退：优先友方领地，其次中立，避开敌方。"""
         county = self.world.map.get(army.location)
         if not county:
             army.status = ArmyStatus.RETREATING
             return
         if not county.neighbors:
-            # ???????????????
+            # 孤立省份：尝试寻找任意可达省份
             all_counties = list(self.world.map.all().keys())
             random.shuffle(all_counties)
             for cid in all_counties:
@@ -689,7 +689,7 @@ class GameSimulation:
                 army.status = ArmyStatus.SIEGING
             o = self.world.character(owner)
             self.world.push_log(
-                f"{(o.name if o else '?')} ???? {county.name} (?? #{sid})"
+                f"{(o.name if o else '?')} 开始围攻 {county.name} (围城 #{sid})"
             )
 
     def tick_sieges(self) -> None:
@@ -705,7 +705,7 @@ class GameSimulation:
                 attacker = self.world.character(ev.attacker)
                 cn = county.name if county else "?"
                 an = attacker.name if attacker else "?"
-                self.world.push_log(f"{an} ??? {cn}?")
+                self.world.push_log(f"{an} 攻陷了 {cn}！")
                 self.world.occupy_county(ev.county, ev.attacker)
                 for w in list(self.wars.active_wars()):
                     if w.involves(ev.attacker) and w.involves(ev.defender):
@@ -724,7 +724,7 @@ class GameSimulation:
             elif ev.kind == "lifted":
                 county = self.world.map.get(ev.county)
                 cn = county.name if county else "?"
-                self.world.push_log(f"?? {cn} ???{ev.reason}")
+                self.world.push_log(f"围攻 {cn} 解除：{ev.reason}")
                 s = self.sieges.sieges.get(ev.siege_id)
                 if s:
                     army = self.wars.army(s.attacker_army)
@@ -751,9 +751,9 @@ class GameSimulation:
                 an = self.world.character(w.attacker_primary)
                 dn = self.world.character(w.defender_primary)
                 self.world.push_log(
-                    f"?????{(an.name if an else '?')} ?? {(dn.name if dn else '?')}???????"
+                    f"战争结束：{(an.name if an else '?')} 战胜 {(dn.name if dn else '?')}，强制执行和约"
                 )
-                # ??????????????
+                # 领土变更：攻击者获得部分省份
                 self._transfer_territory(w.attacker_primary, w.defender_primary)
                 if an:
                     an.add_prestige(w.cb.attacker_prestige_on_win())
@@ -776,9 +776,9 @@ class GameSimulation:
                 an = self.world.character(w.attacker_primary)
                 dn = self.world.character(w.defender_primary)
                 self.world.push_log(
-                    f"?????{(dn.name if dn else '?')} ?? {(an.name if an else '?')}"
+                    f"战争结束：{(dn.name if dn else '?')} 击退 {(an.name if an else '?')}"
                 )
-                # ???????????????
+                # 防御者获胜，攻击者失去部分省份
                 self._transfer_territory(w.defender_primary, w.attacker_primary)
                 if dn:
                     dn.add_prestige(40)
@@ -796,7 +796,7 @@ class GameSimulation:
                     an = self.world.character(w.attacker_primary)
                     dn = self.world.character(w.defender_primary)
                     self.world.push_log(
-                        f"???{(an.name if an else '?')} ? {(dn.name if dn else '?')} ??"
+                        f"白和：{(an.name if an else '?')} 与 {(dn.name if dn else '?')} 停战"
                     )
                     if an:
                         an.add_prestige(-5)
@@ -804,11 +804,11 @@ class GameSimulation:
                         dn.add_prestige(5)
 
     def _transfer_territory(self, winner: int, loser: int) -> None:
-        """?????????"""
+        """战争胜利后转移领土"""
         loser_char = self.world.character(loser)
         if not loser_char:
             return
-        # ????1-2???
+        # 随机转移1-2个省份
         counties_to_transfer = []
         for tid in list(loser_char.held_titles):
             t = self.world.title(tid)
@@ -823,7 +823,7 @@ class GameSimulation:
                 self.world.occupy_county(cid, winner)
                 county = self.world.map.get(cid)
                 if county:
-                    self.world.push_log(f"?????{county.name} ???")
+                    self.world.push_log(f"领土变更：{county.name} 被转移")
 
     def transfer_one_county(self, frm: int, to: int) -> None:
         loser = self.world.character(frm)
@@ -832,93 +832,93 @@ class GameSimulation:
         for tid in list(loser.held_titles):
             t = self.world.title(tid)
             if t and t.tier == TitleTier.COUNTY and t.counties:
-                # ???????? holder + ?????
+                # 走占领路径，确保 holder + 封臣链同步
                 for cid in list(t.counties):
                     self.world.occupy_county(cid, to)
-                self.world.push_log(f"?????{t.name}")
+                self.world.push_log(f"和约割让：{t.name}")
                 return
 
     def print_status(self) -> None:
-        print(f"??: {self.world.date}")
+        print(f"日期: {self.world.date}")
         print(
-            f"??: {sum(1 for _ in self.world.alive_characters())} ?? / "
-            f"{len(self.world.characters)} ??"
+            f"人物: {sum(1 for _ in self.world.alive_characters())} 存活 / "
+            f"{len(self.world.characters)} 总计"
         )
-        print(f"???: {sum(1 for _ in self.world.rulers())}")
-        print(f"???: {len(self.world.map.counties)}")
-        print(f"?????: {sum(1 for _ in self.wars.active_wars())}")
-        print(f"?????: {sum(1 for _ in self.sieges.active_sieges())}")
-        print(f"????: {len(self.factions.factions)}")
-        print(f"?????: {len(self.schemes.schemes)}")
+        print(f"统治者: {sum(1 for _ in self.world.rulers())}")
+        print(f"伯爵领: {len(self.world.map.counties)}")
+        print(f"进行中战争: {sum(1 for _ in self.wars.active_wars())}")
+        print(f"进行中围城: {sum(1 for _ in self.sieges.active_sieges())}")
+        print(f"活跃派系: {len(self.factions.factions)}")
+        print(f"进行中阴谋: {len(self.schemes.schemes)}")
         print()
-        print("?? ????? ??")
+        print("—— 主要统治者 ——")
         for r in self.world.rulers():
             attrs = self.world.effective_attrs(r.id)
             title = self.world.title(r.primary_title)
-            tname = title.name if title else "?"
+            tname = title.name if title else "无"
             income = self.world.monthly_income_of(r.id)
             men = self.wars.total_men_of(r.id)
             martial = attrs.martial if attrs else 0
             profile = AiPersonality.profile_of(self.world, r.id)
             persona = AiPersonality.describe(profile)
             print(
-                f"  {r.name} | {tname} | ?:{r.gold:.0f} ??:{r.prestige:.0f} | "
-                f"??:{martial} | ??:{income:.1f} | ???:{men} | [{persona}]"
+                f"  {r.name} | {tname} | 金:{r.gold:.0f} 威望:{r.prestige:.0f} | "
+                f"军略:{martial} | 月入:{income:.1f} | 野战军:{men} | [{persona}]"
             )
 
     def print_recent_log(self, n: int = 40) -> None:
-        print("\n?? ???? ??")
+        print("\n—— 最近日志 ——")
         for line in self.world.log[-n:]:
             print(f"  {line}")
 
     def print_wars(self) -> None:
-        print("\n?? ?? ??")
+        print("\n—— 战争 ——")
         if not self.wars.wars:
-            print("  ???")
+            print("  （无）")
             return
         for w in self.wars.wars.values():
-            status = "???" if w.active else "???"
+            status = "进行中" if w.active else "已结束"
             an = self.world.character(w.attacker_primary)
             dn = self.world.character(w.defender_primary)
             print(
                 f"  [{status}] {w.name} | "
                 f"{(an.name if an else '?')} vs {(dn.name if dn else '?')} | "
-                f"??:{w.warscore} | {w.cb.name_zh()}"
+                f"分数:{w.warscore} | {w.cb.name_zh()}"
             )
 
     def print_politics(self) -> None:
-        print("\n?? ?? ??")
+        print("\n—— 派系 ——")
         if not self.factions.factions:
-            print("  ???")
+            print("  （无）")
         for f in self.factions.factions.values():
             liege = self.world.character(f.target_liege)
             print(
-                f"  {f.kind.name_zh()} ? {(liege.name if liege else '?')} | "
-                f"??:{len(f.members)} ??:{f.power:.0f} ??:{f.discontent:.0f}"
+                f"  {f.kind.name_zh()} → {(liege.name if liege else '?')} | "
+                f"成员:{len(f.members)} 力量:{f.power:.0f} 不满:{f.discontent:.0f}"
             )
-        print("\n?? ?? ??")
+        print("\n—— 条约 ——")
         if not self.diplomacy.treaties:
-            print("  ???")
+            print("  （无）")
         for t in self.diplomacy.treaties:
             a = self.world.character(t.a)
             b = self.world.character(t.b)
             print(
-                f"  {t.kind.name_zh()} | {(a.name if a else '?')} ? "
-                f"{(b.name if b else '?')} | ? {t.expires_year}"
+                f"  {t.kind.name_zh()} | {(a.name if a else '?')} — "
+                f"{(b.name if b else '?')} | 至 {t.expires_year}"
             )
-        print("\n?? ?? ??")
+        print("\n—— 阴谋 ——")
         if not self.schemes.schemes:
-            print("  ???")
+            print("  （无）")
         for s in self.schemes.schemes.values():
             o = self.world.character(s.owner)
             t = self.world.character(s.target)
             print(
-                f"  {s.kind.name_zh()} | {(o.name if o else '?')} ? "
-                f"{(t.name if t else '?')} | ??:{s.progress:.0f}% ??:{s.secrecy:.0f}"
+                f"  {s.kind.name_zh()} | {(o.name if o else '?')} → "
+                f"{(t.name if t else '?')} | 进度:{s.progress:.0f}% 隐秘:{s.secrecy:.0f}"
             )
 
     def print_dynasties(self) -> None:
-        print("\n?? ?? ??")
+        print("\n—— 王朝 ——")
         for d in self.world.dynasties.values():
             alive = sum(
                 1
@@ -927,8 +927,8 @@ class GameSimulation:
             )
             head = self.world.character(d.head)
             print(
-                f"  {d.name} | ??:{(head.name if head else '?')} | "
-                f"??:{len(d.members)} (??{alive}) | ??:{d.motto}"
+                f"  {d.name} | 族长:{(head.name if head else '无')} | "
+                f"成员:{len(d.members)} (存活{alive}) | 格言:{d.motto}"
             )
 
 
