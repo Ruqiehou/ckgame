@@ -58,6 +58,7 @@ class Decision:
     description: str
     cost_gold: float = 0.0
     cost_prestige: float = 0.0
+    cost_piety: float = 0.0
     cooldown_years: int = 5
     requires_ruler: bool = True
     requires_adult: bool = True
@@ -303,7 +304,7 @@ BUILTIN_DECISIONS: List[Decision] = [
         cooldown_years=20,
         min_gold=200,
         min_prestige=200,
-        min_piety=300,
+        cost_piety=300,
         requires_kingdom=True,
         effects=[],
         log_text="推动信仰改革",

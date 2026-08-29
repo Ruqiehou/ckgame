@@ -56,6 +56,7 @@ class EventDef:
     requires_adult: bool = True
     min_gold: float = 0.0
     requires_married: bool = False
+    requires_children: bool = False
 
 
 @dataclass
@@ -92,6 +93,10 @@ class EventEngine:
         if c.gold < ev.min_gold:
             return False
         if ev.requires_married and not c.is_married():
+            return False
+        if ev.requires_children and not any(
+            child and child.is_alive() for child in (world.character(cid) for cid in c.children)
+        ):
             return False
         return True
 

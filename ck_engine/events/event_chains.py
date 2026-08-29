@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-import random
+import copy
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -47,9 +47,9 @@ class EventChain:
             return self.checker(world, who)
         return True
 
-    def start(self, who: int, date: GameDate) -> None:
+    def start(self, world, who: int) -> None:
         self.active = True
-        self.start_date = date
+        self.start_date = world.date
         self.participants = [who]
         self.current_stage = 0
         if self.stages and self.stages[0].on_enter:
@@ -258,7 +258,7 @@ class ChainEngine:
             if chain.active or chain.completed:
                 continue
             if chain.can_trigger(world, who):
-                chain.start(who, world.date)
+                chain.start(world, who)
                 self.active_chains.append(chain)
                 triggered.append(chain)
         return triggered

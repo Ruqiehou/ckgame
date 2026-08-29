@@ -99,6 +99,8 @@ class SaveGameMixin:
                     "mother": c.mother,
                     "spouses": list(c.spouses),
                     "children": list(c.children),
+                    "betrothed_to": c.betrothed_to,
+                    "education_focus": c.education_focus,
                     "traits": list(c.traits),
                     "opinion_cache": dict(c.opinion_cache),
                 }
@@ -224,6 +226,8 @@ class SaveGameMixin:
             c.mother = row.get("mother", c.mother)
             c.spouses = list(row.get("spouses", []))
             c.children = list(row.get("children", []))
+            c.betrothed_to = row.get("betrothed_to", c.betrothed_to)
+            c.education_focus = row.get("education_focus", c.education_focus)
             c.traits = list(row.get("traits", []))
             c.opinion_cache = {int(k): v for k, v in row.get("opinion_cache", {}).items()}
             if row.get("life") == "DEAD":

@@ -169,6 +169,10 @@ class GameAPI(SnapshotMixin, SaveGameMixin, DiplomacyActionsMixin):
                 )
             elif kind == "break_engagement":
                 self._break_engagement(int(payload["child_id"]))
+            elif kind == "set_child_education":
+                self._set_child_education(
+                    int(payload["child_id"]), str(payload["focus"])
+                )
             elif kind == "execute_decision":
                 self._execute_decision(payload.get("decision_id"))
             elif kind == "appoint_council":
