@@ -11,6 +11,7 @@ com\ckgame\politics\SchemeOutcome.class
 com\ckgame\world\buildings\BuildingSystem$1.class
 com\ckgame\military\WarParticipant.class
 com\ckgame\politics\FactionManager.class
+com\ckgame\ui\GameTUI.class
 com\ckgame\world\MapGraph.class
 com\ckgame\game\ScenarioLoader.class
 com\ckgame\game\GameSimulation$1.class
@@ -28,6 +29,7 @@ com\ckgame\events\Storyline.class
 com\ckgame\military\UnitType.class
 com\ckgame\military\ArmyStatus.class
 com\ckgame\politics\SchemeManager.class
+com\ckgame\ui\SaveManager$SaveInfo.class
 com\ckgame\game\Scenario1066.class
 com\ckgame\core\traits\Traits.class
 com\ckgame\politics\Laws$RealmLaw.class
@@ -53,12 +55,15 @@ com\ckgame\core\calendar\Season.class
 com\ckgame\core\stats\AttributeSet.class
 com\ckgame\politics\Claim.class
 com\ckgame\world\Dynasty.class
+com\ckgame\ui\Main.class
+com\ckgame\ui\SaveManager.class
 com\ckgame\core\Gender.class
 com\ckgame\core\TitleTier.class
 com\ckgame\core\traits\TraitKind.class
 com\ckgame\politics\CasusBelli.class
 com\ckgame\events\Effect.class
 com\ckgame\politics\FactionEvent.class
+com\ckgame\ui\SaveManager$LoadedGame.class
 com\ckgame\politics\CouncilPosition.class
 com\ckgame\politics\Scheme.class
 com\ckgame\politics\Treaty.class
@@ -66,6 +71,7 @@ com\ckgame\world\Title.class
 com\ckgame\game\GameSimulation.class
 com\ckgame\politics\Diplomacy$RelationKey.class
 com\ckgame\core\balance\Balance.class
+com\ckgame\ui\GameAPI.class
 com\ckgame\world\Terrain.class
 com\ckgame\events\StorylineSystem.class
 com\ckgame\military\WarManager.class

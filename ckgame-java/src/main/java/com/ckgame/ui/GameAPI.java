@@ -66,9 +66,14 @@ public final class GameAPI {
 
     // ─────────────────── 构造 ───────────────────
 
-    /** 新开局。 */
+    /** 新开局（默认场景）。 */
     public GameAPI() {
-        this.sim = new GameSimulation();
+        this(null);
+    }
+
+    /** 新开局，指定场景 id 或场景文件路径。 */
+    public GameAPI(String scenario) {
+        this.sim = new GameSimulation(scenario);
         this.playerId = defaultPlayer();
         syncPlayer();
         messages.add("欢迎。点击地图省份查看详情，使用侧栏下达指令。");
@@ -410,7 +415,7 @@ public final class GameAPI {
                 case "save" -> doSave((String) payload.get("name"));
                 case "load" -> doLoad((String) payload.get("name"));
                 case "delete_save" -> doDeleteSave((String) payload.get("name"));
-                case "new_game" -> doNewGame();
+                case "new_game" -> doNewGame(payload.get("scenario"));
                 case "toggle_cheat" -> {
                     cheatMode = !cheatMode;
                     if (cheatMode) {

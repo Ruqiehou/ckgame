@@ -43,7 +43,11 @@ public final class GameTUI {
     /* ──────────────────── 构造 ──────────────────── */
 
     public GameTUI() {
-        this.api = new GameAPI();
+        this(null);
+    }
+
+    public GameTUI(String scenario) {
+        this.api = new GameAPI(scenario);
         this.scanner = new Scanner(System.in);
     }
 
