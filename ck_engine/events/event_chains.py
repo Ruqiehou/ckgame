@@ -241,6 +241,10 @@ BUILTIN_CHAINS: List[EventChain] = [
 ]
 
 
+def builtin_chains() -> List[EventChain]:
+    return copy.deepcopy(BUILTIN_CHAINS)
+
+
 @dataclass
 class ChainEngine:
     chains: List[EventChain] = field(default_factory=list)

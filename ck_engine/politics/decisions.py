@@ -266,7 +266,7 @@ BUILTIN_DECISIONS: List[Decision] = [
         effects=[],
         log_text="迁都完成",
         checker=_check_has_multiple_counties,
-        execute=_exec_move_capital,
+        executor=_exec_move_capital,
     ),
     Decision(
         id="call_crusade",
@@ -278,12 +278,12 @@ BUILTIN_DECISIONS: List[Decision] = [
         cooldown_years=10,
         min_gold=300,
         min_prestige=300,
-        min_piety=200,
+        cost_piety=200,
         requires_kingdom=True,
         effects=[],
         log_text="号令十字军",
         checker=_check_christian,
-        execute=_exec_call_crusade,
+        executor=_exec_call_crusade,
     ),
     Decision(
         id="hold_tournament",
@@ -295,7 +295,7 @@ BUILTIN_DECISIONS: List[Decision] = [
         min_gold=100,
         effects=[],
         log_text="举办比武大会",
-        execute=_exec_hold_tournament,
+        executor=_exec_hold_tournament,
     ),
     Decision(
         id="reform_faith",
@@ -311,7 +311,7 @@ BUILTIN_DECISIONS: List[Decision] = [
         requires_kingdom=True,
         effects=[],
         log_text="推动信仰改革",
-        execute=_exec_reform_faith,
+        executor=_exec_reform_faith,
     ),
     Decision(
         id="restore_empire",
