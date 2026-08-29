@@ -38,6 +38,7 @@ class Character:
     children: List[int] = field(default_factory=list)
     betrothed_to: int = NONE_ID  # 婚约对象（未成年时可订婚）
     education_focus: str = ""  # 未成年子女的教育方向（AttributeSet 字段名）
+    education_years: int = 0
     held_titles: List[int] = field(default_factory=list)
     primary_title: int = NONE_ID
     is_ruler: bool = False

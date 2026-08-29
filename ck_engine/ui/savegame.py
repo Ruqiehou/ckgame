@@ -228,6 +228,7 @@ class SaveGameMixin:
             c.children = list(row.get("children", []))
             c.betrothed_to = row.get("betrothed_to", c.betrothed_to)
             c.education_focus = row.get("education_focus", c.education_focus)
+            c.education_years = int(row.get("education_years", 0))
             c.traits = list(row.get("traits", []))
             c.opinion_cache = {int(k): v for k, v in row.get("opinion_cache", {}).items()}
             if row.get("life") == "DEAD":

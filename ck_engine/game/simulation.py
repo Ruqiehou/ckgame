@@ -1,0 +1,952 @@
+from __future__ import annotations
+
+import random
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import Dict, List
+
+from ck_engine.ai import AiDirector, AiPersonality
+from ck_engine.core import NONE_ID, Season
+from ck_engine.events import EventEngine
+from ck_engine.events.event_chains import ChainEngine, builtin_chains
+from ck_engine.events.storylines import StorylineSystem, builtin_storylines
+from ck_engine.politics.decisions import DecisionEngine
+from ck_engine.game.scenario_loader import DEFAULT_SCENARIO, load_scenario
+from ck_engine.military import (
+    ArmyStatus,
+    BattleSimulator,
+    SiegeManager,
+    WarManager,
+    WarResult,
+)
+from ck_engine.politics import (
+    CasusBelli,
+    CouncilRegistry,
+    DiplomacySystem,
+    FactionKind,
+    FactionSystem,
+    RealmLaw,
+    CrownAuthority,
+    SchemeKind,
+    SchemeSystem,
+)
+from ck_engine.world import TitleTier, World
+from ck_engine.world.buildings import BuildingSystem
+
+
+@dataclass
+class PendingUltimatum:
+    """?????????????????????"""
+
+    faction_id: int
+    kind: FactionKind
+    liege: int
+    members: List[int]
+
+
+class GameSimulation:
+    def __init__(self, scenario: str | None = None) -> None:
+        self.scenario_id = scenario or DEFAULT_SCENARIO
+        self.world: World = load_scenario(self.scenario_id)
+        self.wars = WarManager()
+        self.sieges = SiegeManager()
+        self.events = EventEngine()
+        self.factions = FactionSystem()
+        self.schemes = SchemeSystem()
+        self.diplomacy = DiplomacySystem()
+        self.councils = CouncilRegistry()
+        self.buildings = BuildingSystem()
+        self.storylines = StorylineSystem()
+        self.decisions = DecisionEngine()
+        self.chains = ChainEngine(builtin_chains())
+        self.realm_laws: Dict[int, RealmLaw] = {}
+        self.player_ids: set = set()
+        self.pending_ultimatums: Dict[int, PendingUltimatum] = {}
+        self.bootstrap()
+
+    def bootstrap(self) -> None:
+        william = next(
+            (c.id for c in self.world.alive_characters() if "??????" in c.name),
+            None,
+        )
+        harold = next(
+            (c.id for c in self.world.alive_characters() if "???" in c.name),
+            None,
+        )
+        if william and harold:
+            self.diplomacy.set_rival(william, harold)
+            eng = next(
+                (t.id for t in self.world.titles.values() if "???" in t.name),
+                None,
+            )
+            if eng:
+                self.diplomacy.add_claim(william, eng, strength=80)
+        edwin = next((c.id for c in self.world.alive_characters() if "???" in c.name), None)
+        morcar = next((c.id for c in self.world.alive_characters() if "??" in c.name), None)
+        if edwin and morcar:
+            self.diplomacy.form_alliance(edwin, morcar, self.world.date)
+        for r in list(self.world.rulers()):
+            self.ensure_council(r.id)
+            self.realm_laws.setdefault(r.id, RealmLaw.feudal_default())
+        for storyline in builtin_storylines():
+            self.storylines.create_storyline(storyline)
+
+    def ensure_council(self, ruler: int) -> None:
+        candidates = []
+        for c in self.world.alive_characters():
+            if c.id == ruler or not c.is_adult(self.world.date):
+                continue
+            a = self.world.effective_attrs(c.id)
+            if not a:
+                continue
+            candidates.append(
+                (c.id, a.diplomacy, a.martial, a.stewardship, a.intrigue, a.learning)
+            )
+        council = self.councils.get_or_create(ruler)
+        if not council.members():
+            council.auto_appoint(candidates)
+
+    def run_days(self, days: int) -> None:
+        for _ in range(days):
+            self.tick_day()
+
+    def tick_day(self) -> None:
+        self.world.date = self.world.date.advance_one_day()
+        self.world.tick += 1
+        season = self.world.date.season()
+        winter = season == Season.WINTER
+
+        def move_chance(army) -> float:
+            chance = 1.0
+            if season == Season.WINTER:
+                chance *= 0.55
+            elif season == Season.AUTUMN:
+                chance *= 0.85
+            if army.supply < 30.0:
+                chance *= 0.7
+            return max(0.2, chance)
+
+        self.wars.tick_movement(move_chance_of=move_chance)
+        self._tick_army_supply(winter=winter)
+        self.resolve_encounters()
+        self.tick_sieges()
+        self.wars.disband_empty()
+        self.events.tick_cooldowns()
+        if self.world.date.is_month_start():
+            self.tick_month()
+        if self.world.date.is_year_start():
+            self.world.push_log(f"?? {self.world.date.year} ??? ??")
+            for line in self.diplomacy.expire_treaties(self.world.date.year, world=self.world):
+                self.world.push_log(line)
+
+    def _tick_army_supply(self, winter: bool) -> None:
+        enemy_holders: Dict[int, set] = {}
+        for w in self.wars.active_wars():
+            atk = {p.character for p in w.participants if p.is_attacker}
+            dfd = {p.character for p in w.participants if not p.is_attacker}
+            for a in atk:
+                enemy_holders.setdefault(a, set()).update(dfd)
+            for d in dfd:
+                enemy_holders.setdefault(d, set()).update(atk)
+        for army in self.wars.armies.values():
+            if not army.is_active():
+                continue
+            county = self.world.map.get(army.location)
+            if not county:
+                continue
+            enemies = enemy_holders.get(army.owner, set())
+            in_friendly = county.holder not in enemies
+            army.apply_supply_tick(in_friendly=in_friendly, winter=winter)
+
+    def tick_month(self) -> None:
+        self.world.process_health()
+
+        # ???????????????????????????????
+        by_owner: Dict[int, List] = {}
+        for army in self.wars.armies.values():
+            if army.is_active():
+                by_owner.setdefault(army.owner, []).append(army)
+        for owner, armies in by_owner.items():
+            c = self.world.character(owner)
+            if not c:
+                continue
+            cost = sum(a.monthly_maintenance() for a in armies)
+            # ???????????????
+            cost *= 1.25
+            if c.gold >= cost:
+                c.add_gold(-cost)
+                continue
+            # ?????????????????
+            c.add_gold(-c.gold)
+            armies.sort(key=lambda a: a.total_men(), reverse=True)
+            dis = armies[0]
+            dis.status = ArmyStatus.DISBANDED
+            dis.stacks.clear()
+            self.world.push_log(f"{c.name} ????????? {dis.name}")
+
+        self.world.process_monthly_economy()
+        self.world.process_fertility()
+
+        # ?????????
+        for c in self.world.alive_characters():
+            c.gain_xp(5)
+
+        for rid in [r.id for r in self.world.rulers()]:
+            law = self.realm_laws.get(rid)
+            if law and law.crown_authority.tax_bonus() > 0:
+                income = self.world.monthly_income_of(rid) * law.crown_authority.tax_bonus()
+                c = self.world.character(rid)
+                if c:
+                    c.add_gold(income)
+
+        self.tick_councils()
+        # ????????????
+        for rid in [r.id for r in self.world.rulers()]:
+            if rid in self.player_ids:
+                self.chains.check_triggers(self.world, rid)
+                self.chains.tick(self.world, rid)
+        chars = [
+            c.id
+            for c in self.world.alive_characters()
+            if c.is_ruler or c.is_adult(self.world.date)
+        ][:50]
+        self.events.daily_check(self.world, chars)
+        ai_pending = [e for e in self.events.pending if e.character not in self.player_ids]
+        self.events.pending = [e for e in self.events.pending if e.character in self.player_ids]
+        for inst in ai_pending:
+            best = max(inst.choices, key=lambda c: c.ai_weight)
+            self.events.resolve_choice(self.world, inst, best.id)
+        self.tick_factions()
+        self.tick_schemes()
+        actions = AiDirector.monthly_actions(
+            self.world,
+            self.wars,
+            self.diplomacy,
+            self.schemes,
+            skip_ids=set(self.player_ids),
+        )
+        AiDirector.apply_actions(
+            self.world, self.wars, self.diplomacy, self.schemes, actions
+        )
+        self.tick_wars()
+        # ??????????????????
+        at_war_ids = set()
+        for w in self.wars.active_wars():
+            at_war_ids.add(w.attacker_primary)
+            at_war_ids.add(w.defender_primary)
+        self.diplomacy.tick_war_exhaustion(except_ids=at_war_ids)
+        self.try_start_sieges()
+
+        for r in list(self.world.rulers()):
+            self.ensure_council(r.id)
+            self.realm_laws.setdefault(r.id, RealmLaw.feudal_default())
+
+    def _process_family(self) -> None:
+        """??????????????????????"""
+        for child in list(self.world.alive_characters()):
+            if child.education_focus:
+                if child.is_adult(self.world.date):
+                    child.education_focus = ""
+                elif random.random() < 0.2:
+                    current = getattr(child.base_attrs, child.education_focus)
+                    setattr(child.base_attrs, child.education_focus, min(100, current + 1))
+
+            target_id = child.betrothed_to
+            if target_id == NONE_ID or child.id > target_id:
+                continue
+            target = self.world.character(target_id)
+            if not target or not target.is_alive() or target.betrothed_to != child.id:
+                child.betrothed_to = NONE_ID
+                continue
+            if child.is_adult(self.world.date) and target.is_adult(self.world.date):
+                child.betrothed_to = NONE_ID
+                target.betrothed_to = NONE_ID
+                self.world.marry(child.id, target.id)
+
+    def tick_councils(self) -> None:
+        skill_map: Dict[int, tuple] = {}
+        for c in self.world.alive_characters():
+            a = self.world.effective_attrs(c.id)
+            if a:
+                skill_map[c.id] = (
+                    a.diplomacy,
+                    a.martial,
+                    a.stewardship,
+                    a.intrigue,
+                    a.learning,
+                )
+        for rid in [r.id for r in self.world.rulers()]:
+            council = self.councils.get_or_create(rid)
+            effect = council.monthly_effect(skill_map)
+            c = self.world.character(rid)
+            if c:
+                c.add_gold(effect.gold)
+                c.add_prestige(effect.prestige)
+                c.piety = max(0.0, c.piety + effect.piety)
+            if effect.control_gain > 0 and c:
+                for tid in list(c.held_titles):
+                    t = self.world.title(tid)
+                    if not t:
+                        continue
+                    for cid in t.counties:
+                        county = self.world.map.get(cid)
+                        if county:
+                            county.control = min(100.0, county.control + effect.control_gain * 0.2)
+            if effect.development_chance > 0 and random.random() < 0.05 and c:
+                if c.held_titles:
+                    t = self.world.title(c.held_titles[0])
+                    if t and t.counties:
+                        county = self.world.map.get(t.counties[0])
+                        if county and county.development < county.terrain.development_cap():
+                            county.development += 1
+            if effect.claim_progress >= 20 and random.random() < 0.15 and c:
+                owned = set()
+                for tid in c.held_titles:
+                    t = self.world.title(tid)
+                    if t:
+                        owned.update(t.counties)
+                target = next(
+                    (co for co in self.world.map.iter() if co.id not in owned),
+                    None,
+                )
+                if target:
+                    self.diplomacy.add_claim(rid, target.owner_title, target.id, 50)
+                    self.world.push_log(f"{c.name} ???? {target.name} ???")
+            # ?????????????????????
+            if any("??????" in line for line in effect.logs):
+                spy = council.spymaster
+                spy_skill = skill_map.get(spy, (8, 8, 8, 8, 8))[3]
+                for scheme in list(self.schemes.schemes.values()):
+                    if not scheme.exposed and not scheme.is_complete() and scheme.target == rid:
+                        scheme.progress = max(0.0, scheme.progress - spy_skill * 0.4)
+                        scheme.secrecy = max(0.0, scheme.secrecy - spy_skill * 0.2)
+
+    def tick_factions(self) -> None:
+        vassal_pairs = []
+        for t in self.world.titles.values():
+            if t.holder == NONE_ID or t.de_facto_liege == NONE_ID:
+                continue
+            lt = self.world.title(t.de_facto_liege)
+            if not lt or lt.holder == NONE_ID or lt.holder == t.holder:
+                continue
+            op = self.world.opinion(t.holder, lt.holder)
+            law = self.realm_laws.get(lt.holder)
+            if law:
+                op += law.crown_authority.vassal_opinion_penalty()
+            vassal_pairs.append((t.holder, lt.holder, op))
+
+        mil: Dict[int, float] = {}
+        liege_pow: Dict[int, float] = {}
+        for r in self.world.rulers():
+            p = float(estimate_power(self.world, r.id))
+            mil[r.id] = p
+            liege_pow[r.id] = p
+        for v, _, _ in vassal_pairs:
+            mil.setdefault(v, float(estimate_power(self.world, v)))
+
+        self.factions.recompute_power(mil, liege_pow)
+        opinions = {v: op for v, _, op in vassal_pairs}
+        self.factions.tick_discontent(opinions)
+        events = self.factions.monthly_ai(vassal_pairs, random.random)
+        for ev in events:
+            if ev.kind == "formed":
+                founder = self.world.character(ev.founder)
+                liege = self.world.character(ev.liege)
+                fk = ev.faction_kind.name_zh() if ev.faction_kind else "??"
+                if founder and liege:
+                    self.world.push_log(f"{founder.name} ?? {liege.name} ???{fk}")
+            elif ev.kind == "joined":
+                who = self.world.character(ev.who)
+                if who:
+                    self.world.push_log(f"{who.name} ?????")
+            elif ev.kind == "ultimatum":
+                self._process_ultimatum_event(ev)
+            elif ev.kind == "revolt":
+                if ev.faction_id in self.pending_ultimatums:
+                    # ?????????????
+                    continue
+                liege = self.world.character(ev.liege)
+                fk = ev.faction_kind.name_zh() if ev.faction_kind else "??"
+                if liege:
+                    self.world.push_log(f"?????{fk} vs {liege.name}")
+                if ev.members:
+                    leader = ev.members[0]
+                    cb = (
+                        CasusBelli.DEPOSE_LIEGE
+                        if ev.faction_kind
+                        in (FactionKind.CLAIMANT, FactionKind.POPULAR)
+                        else CasusBelli.INDEPENDENCE
+                    )
+                    if self.diplomacy.can_declare_war(leader, ev.liege, self.world.date.year):
+                        self.wars.declare_war(
+                            cb, leader, ev.liege, self.world.date, f"{fk}??"
+                        )
+                        self.diplomacy.set_at_war(leader, ev.liege, True)
+                self.factions.dissolve(ev.faction_id)
+            elif ev.kind == "dissolved":
+                self.world.push_log(f"?????{ev.reason}")
+
+    # ---------- ???? ----------
+    def _process_ultimatum_event(self, ev) -> None:
+        """??????????????????AI ???????"""
+        liege = self.world.character(ev.liege)
+        text = ev.faction_kind.ultimatum_text() if ev.faction_kind else "??"
+        if liege:
+            self.world.push_log(
+                f"??? {liege.name} ???????{text}?{len(ev.members)} ??"
+            )
+        f = self.factions.factions.get(ev.faction_id)
+        if not f:
+            return
+        f.discontent = min(100.0, f.discontent + 20)
+        if ev.liege in self.player_ids:
+            self.pending_ultimatums[f.id] = PendingUltimatum(
+                faction_id=f.id,
+                kind=f.kind,
+                liege=ev.liege,
+                members=list(f.members),
+            )
+        else:
+            # AI???????????????????
+            self.resolve_ultimatum(f.id, accept=f.power >= 100.0)
+
+    def resolve_ultimatum(self, faction_id: int, accept: bool) -> None:
+        """?????????????????????????"""
+        f = self.factions.factions.get(faction_id)
+        if not f:
+            self.pending_ultimatums.pop(faction_id, None)
+            raise ValueError("?????????")
+        if accept:
+            self._apply_ultimatum_accept(f)
+        else:
+            self._apply_ultimatum_reject(f)
+        self.pending_ultimatums.pop(faction_id, None)
+        self.factions.dissolve(faction_id)
+
+    def _apply_ultimatum_accept(self, f) -> None:
+        liege = self.world.character(f.target_liege)
+        liege_name = liege.name if liege else "?"
+        if f.kind == FactionKind.INDEPENDENCE:
+            for m in f.members:
+                char = self.world.character(m)
+                if not char:
+                    continue
+                for tid in list(char.held_titles):
+                    t = self.world.title(tid)
+                    if t and t.de_facto_liege != NONE_ID:
+                        self.world.clear_vassal_link(tid)
+            self.world.push_log(f"{liege_name} ???????????????????")
+        elif f.kind == FactionKind.LOWER_CROWN_AUTHORITY:
+            if liege and liege.primary_title != NONE_ID:
+                title = self.world.title(liege.primary_title)
+                laws = [title.realm_law] if title else []
+                if f.target_liege in self.realm_laws:
+                    laws.append(self.realm_laws[f.target_liege])
+                for law in laws:
+                    if law.crown_authority > CrownAuthority.AUTONOMOUS:
+                        law.crown_authority = CrownAuthority(law.crown_authority - 1)
+            self.world.push_log(f"{liege_name} ??????????????????")
+        elif f.kind == FactionKind.CLAIMANT:
+            claimant = (
+                self.world.character(f.claimant)
+                if f.claimant not in (None, NONE_ID)
+                else None
+            )
+            if not claimant or not claimant.is_alive():
+                claimant = next(
+                    (
+                        self.world.character(m)
+                        for m in f.members
+                        if self.world.character(m) and self.world.character(m).is_alive()
+                    ),
+                    None,
+                )
+            if claimant and liege and liege.primary_title != NONE_ID:
+                self.world.grant_title(liege.primary_title, claimant.id)
+                self.world.push_log(
+                    f"{liege_name} ????{claimant.name} ??????????"
+                )
+            else:
+                self.world.push_log(f"{liege_name} ?????????????????")
+        else:  # LIBERTY / POPULAR
+            for m in f.members:
+                self.world.modify_opinion(m, f.target_liege, 25)
+            if liege:
+                liege.add_prestige(-20)
+            self.world.push_log(f"{liege_name} ???????????????")
+
+    def _apply_ultimatum_reject(self, f) -> None:
+        liege = self.world.character(f.target_liege)
+        liege_name = liege.name if liege else "?"
+        self.world.push_log(f"{liege_name} ????????")
+        leader = f.members[0] if f.members else NONE_ID
+        cb = (
+            CasusBelli.DEPOSE_LIEGE
+            if f.kind in (FactionKind.CLAIMANT, FactionKind.POPULAR)
+            else CasusBelli.INDEPENDENCE
+        )
+        if (
+            leader != NONE_ID
+            and self.diplomacy.can_declare_war(leader, f.target_liege, self.world.date.year)
+        ):
+            self.wars.declare_war(
+                cb, leader, f.target_liege, self.world.date, f"{f.kind.name_zh()}??"
+            )
+            self.diplomacy.set_at_war(leader, f.target_liege, True)
+
+    def tick_schemes(self) -> None:
+        intrigue = {}
+        for c in self.world.alive_characters():
+            a = self.world.effective_attrs(c.id)
+            if a:
+                intrigue[c.id] = a.intrigue
+        for council in self.councils.by_ruler.values():
+            if council.spymaster != NONE_ID:
+                intrigue[council.ruler] = intrigue.get(council.ruler, 8) + 2
+        outcomes = self.schemes.monthly_tick(intrigue, random.random)
+        for o in outcomes:
+            if o.kind == "success" and o.scheme_kind:
+                owner = self.world.character(o.owner)
+                target = self.world.character(o.target)
+                on = owner.name if owner else "?"
+                tn = target.name if target else "?"
+                kind = o.scheme_kind
+                if kind == SchemeKind.MURDER:
+                    self.world.push_log(f"?????{on} ??? {tn}?")
+                    target = self.world.character(o.target)
+                    law = None
+                    if target and target.primary_title != NONE_ID:
+                        t = self.world.title(target.primary_title)
+                        if t:
+                            law = t.realm_law
+                    self.world.on_death(o.target, law=law)
+                    if owner:
+                        owner.add_stress(20)
+                        owner.add_prestige(-15)
+                elif kind == SchemeKind.SWAY:
+                    self.world.modify_opinion(o.target, o.owner, 25)
+                    self.world.push_log(f"{on} ????? {tn}")
+                elif kind == SchemeKind.FABRICATE_HOOK:
+                    self.world.modify_opinion(o.target, o.owner, -10)
+                    self.world.push_log(f"{on} ??? {tn} ???")
+                    if owner:
+                        owner.add_prestige(10)
+                elif kind == SchemeKind.ABDUCT:
+                    self.world.push_log(f"{on} ??? {tn}")
+                    if target:
+                        target.add_stress(30)
+                elif kind == SchemeKind.SEDUCE:
+                    self.world.modify_opinion(o.target, o.owner, 30)
+                    self.world.push_log(f"{on} ? {tn} ????")
+                elif kind == SchemeKind.CLAIM_FABRICATION:
+                    self.world.push_log(f"{on} ??? {tn} ???????")
+            elif o.kind == "exposed":
+                owner = self.world.character(o.owner)
+                target = self.world.character(o.target)
+                on = owner.name if owner else "?"
+                tn = target.name if target else "?"
+                self.world.push_log(f"?????{on} ? {tn} ??????")
+                self.world.modify_opinion(o.target, o.owner, -40)
+                if owner:
+                    owner.add_prestige(-25)
+                    owner.add_stress(15)
+
+    def resolve_encounters(self) -> None:
+        # ????????O(n)
+        by_loc: Dict[int, List[tuple]] = defaultdict(list)
+        for a in self.wars.armies.values():
+            if a.is_active():
+                by_loc[a.location].append((a.id, a.owner, a.total_men()))
+
+        for loc, loc_armies in by_loc.items():
+            if len(loc_armies) < 2:
+                continue
+            # ???????owner -> [(army_id, men), ...]
+            by_owner: Dict[int, List[tuple]] = defaultdict(list)
+            for aid, owner, men in loc_armies:
+                by_owner[owner].append((aid, men))
+
+            owners = list(by_owner.keys())
+            for i in range(len(owners)):
+                for j in range(i + 1, len(owners)):
+                    oa, ob = owners[i], owners[j]
+                    enemies = any(
+                        (w.is_attacker(oa) and not w.is_attacker(ob) and w.involves(ob))
+                        or (w.is_attacker(ob) and not w.is_attacker(oa) and w.involves(oa))
+                        for w in self.wars.active_wars()
+                    )
+                    if not enemies:
+                        continue
+                    # ???????????????
+                    a_id = max(by_owner[oa], key=lambda row: row[1])[0]
+                    b_id = max(by_owner[ob], key=lambda row: row[1])[0]
+                    army_a = self.wars.armies.get(a_id)
+                    army_b = self.wars.armies.get(b_id)
+                    if not army_a or not army_b:
+                        continue
+                    self._resolve_battle_pair(army_a, army_b)
+
+    def _resolve_battle_pair(self, army_a, army_b) -> None:
+        atk_m = (self.world.effective_attrs(army_a.commander) or type("A", (), {"martial": 8})()).martial
+        def_m = (self.world.effective_attrs(army_b.commander) or type("A", (), {"martial": 8})()).martial
+        county = self.world.map.get(army_a.location)
+        width = county.terrain.combat_width() if county else 1.0
+        from ck_engine.core.balance import SEASON_COMBAT
+
+        season = self.world.date.season()
+        season_mod = SEASON_COMBAT.get(season.name, 1.0)
+        result = BattleSimulator.resolve(
+            army_a, army_b, atk_m, def_m, width, season_mod=season_mod
+        )
+        an = self.world.character(army_a.owner)
+        bn = self.world.character(army_b.owner)
+        self.world.push_log(
+            f"???{(an.name if an else '?')} vs {(bn.name if bn else '?')} ? {result.description}"
+        )
+        for w in list(self.wars.active_wars()):
+            if w.involves(army_a.owner) and w.involves(army_b.owner):
+                if w.is_attacker(army_a.owner):
+                    w.apply_warscore(result.warscore_change)
+                else:
+                    w.apply_warscore(-result.warscore_change)
+        loser = army_b if result.attacker_won else army_a
+        self._retreat_army(loser)
+
+    def _retreat_army(self, army) -> None:
+        """??????????????????????"""
+        county = self.world.map.get(army.location)
+        if not county:
+            army.status = ArmyStatus.RETREATING
+            return
+        if not county.neighbors:
+            # ???????????????
+            all_counties = list(self.world.map.all().keys())
+            random.shuffle(all_counties)
+            for cid in all_counties:
+                if cid == army.location:
+                    continue
+                path = self.world.map.path(army.location, cid)
+                if path:
+                    army.set_path(path)
+                    army.status = ArmyStatus.RETREATING
+                    return
+            army.status = ArmyStatus.RETREATING
+            return
+        enemy_holders = set()
+        for w in self.wars.active_wars():
+            if not w.involves(army.owner):
+                continue
+            for p in w.participants:
+                if w.is_attacker(p.character) != w.is_attacker(army.owner):
+                    enemy_holders.add(p.character)
+        friendly: List[int] = []
+        neutral: List[int] = []
+        hostile: List[int] = []
+        for nid in county.neighbors:
+            n = self.world.map.get(nid)
+            if not n:
+                continue
+            if n.holder == army.owner:
+                friendly.append(nid)
+            elif n.holder in enemy_holders:
+                hostile.append(nid)
+            else:
+                neutral.append(nid)
+        dest = (friendly or neutral or hostile or list(county.neighbors))[0]
+        army.location = dest
+        army.path.clear()
+        army.status = ArmyStatus.RETREATING
+
+    def try_start_sieges(self) -> None:
+        snapshots = [
+            (a.id, a.owner, a.location)
+            for a in self.wars.armies.values()
+            if a.is_active() and a.status == ArmyStatus.IDLE
+        ]
+        for aid, owner, loc in snapshots:
+            county = self.world.map.get(loc)
+            if not county or county.holder in (NONE_ID, owner):
+                continue
+            enemies = any(
+                w.involves(owner)
+                and w.involves(county.holder)
+                and w.is_attacker(owner) != w.is_attacker(county.holder)
+                for w in self.wars.active_wars()
+            )
+            if not enemies or self.sieges.active_at(loc):
+                continue
+            sid = self.sieges.start(
+                loc,
+                aid,
+                owner,
+                county.holder,
+                county.fort_level,
+                max(50, county.levies // 4),
+                self.world.date,
+            )
+            army = self.wars.army(aid)
+            if army:
+                army.status = ArmyStatus.SIEGING
+            o = self.world.character(owner)
+            self.world.push_log(
+                f"{(o.name if o else '?')} ???? {county.name} (?? #{sid})"
+            )
+
+    def tick_sieges(self) -> None:
+        men, martial, locs = {}, {}, {}
+        for a in self.wars.armies.values():
+            men[a.id] = a.total_men()
+            locs[a.id] = a.location
+            attrs = self.world.effective_attrs(a.commander)
+            martial[a.id] = attrs.martial if attrs else 8
+        for ev in self.sieges.tick_day(men, martial, locs):
+            if ev.kind == "captured":
+                county = self.world.map.get(ev.county)
+                attacker = self.world.character(ev.attacker)
+                cn = county.name if county else "?"
+                an = attacker.name if attacker else "?"
+                self.world.push_log(f"{an} ??? {cn}?")
+                self.world.occupy_county(ev.county, ev.attacker)
+                for w in list(self.wars.active_wars()):
+                    if w.involves(ev.attacker) and w.involves(ev.defender):
+                        if w.is_attacker(ev.attacker):
+                            w.apply_warscore(25)
+                        else:
+                            w.apply_warscore(-25)
+                s = self.sieges.sieges.get(ev.siege_id)
+                if s:
+                    army = self.wars.army(s.attacker_army)
+                    if army and army.status == ArmyStatus.SIEGING:
+                        army.status = ArmyStatus.IDLE
+                if attacker:
+                    attacker.add_prestige(10)
+                    attacker.add_gold(5)
+            elif ev.kind == "lifted":
+                county = self.world.map.get(ev.county)
+                cn = county.name if county else "?"
+                self.world.push_log(f"?? {cn} ???{ev.reason}")
+                s = self.sieges.sieges.get(ev.siege_id)
+                if s:
+                    army = self.wars.army(s.attacker_army)
+                    if army and army.status == ArmyStatus.SIEGING:
+                        army.status = ArmyStatus.IDLE
+
+    def tick_wars(self) -> None:
+        for wid in [w.id for w in self.wars.active_wars()]:
+            w = self.wars.war(wid)
+            if not w:
+                continue
+            self.diplomacy.add_war_exhaustion(w.attacker_primary, 1.0)
+            self.diplomacy.add_war_exhaustion(w.defender_primary, 0.8)
+            if w.warscore > 0:
+                w.apply_warscore(-1)
+            elif w.warscore < 0:
+                w.apply_warscore(1)
+            if w.can_enforce() or w.warscore >= 100:
+                self.wars.end_war(wid, WarResult.ATTACKER_VICTORY)
+                self.diplomacy.set_at_war(w.attacker_primary, w.defender_primary, False)
+                self.diplomacy.set_truce(
+                    w.attacker_primary, w.defender_primary, self.world.date.year + 5
+                )
+                an = self.world.character(w.attacker_primary)
+                dn = self.world.character(w.defender_primary)
+                self.world.push_log(
+                    f"?????{(an.name if an else '?')} ?? {(dn.name if dn else '?')}???????"
+                )
+                # ??????????????
+                self._transfer_territory(w.attacker_primary, w.defender_primary)
+                if an:
+                    an.add_prestige(w.cb.attacker_prestige_on_win())
+                    an.add_gold(30)
+                if dn:
+                    dn.add_prestige(-30)
+                    dn.add_gold(-20)
+                if w.cb in (
+                    CasusBelli.CONQUEST,
+                    CasusBelli.CLAIM,
+                    CasusBelli.DE_JURE,
+                ):
+                    self.transfer_one_county(w.defender_primary, w.attacker_primary)
+            elif w.can_surrender() or w.warscore <= -100:
+                self.wars.end_war(wid, WarResult.DEFENDER_VICTORY)
+                self.diplomacy.set_at_war(w.attacker_primary, w.defender_primary, False)
+                self.diplomacy.set_truce(
+                    w.attacker_primary, w.defender_primary, self.world.date.year + 5
+                )
+                an = self.world.character(w.attacker_primary)
+                dn = self.world.character(w.defender_primary)
+                self.world.push_log(
+                    f"?????{(dn.name if dn else '?')} ?? {(an.name if an else '?')}"
+                )
+                # ???????????????
+                self._transfer_territory(w.defender_primary, w.attacker_primary)
+                if dn:
+                    dn.add_prestige(40)
+                if an:
+                    an.add_prestige(-20)
+            else:
+                atk_exh = self.diplomacy.war_exhaustion.get(w.attacker_primary, 0.0)
+                def_exh = self.diplomacy.war_exhaustion.get(w.defender_primary, 0.0)
+                if w.can_white_peace(self.world.date, atk_exh, def_exh):
+                    self.wars.end_war(wid, WarResult.WHITE_PEACE)
+                    self.diplomacy.set_at_war(w.attacker_primary, w.defender_primary, False)
+                    self.diplomacy.set_truce(
+                        w.attacker_primary, w.defender_primary, self.world.date.year + 3
+                    )
+                    an = self.world.character(w.attacker_primary)
+                    dn = self.world.character(w.defender_primary)
+                    self.world.push_log(
+                        f"???{(an.name if an else '?')} ? {(dn.name if dn else '?')} ??"
+                    )
+                    if an:
+                        an.add_prestige(-5)
+                    if dn:
+                        dn.add_prestige(5)
+
+    def _transfer_territory(self, winner: int, loser: int) -> None:
+        """?????????"""
+        loser_char = self.world.character(loser)
+        if not loser_char:
+            return
+        # ????1-2???
+        counties_to_transfer = []
+        for tid in list(loser_char.held_titles):
+            t = self.world.title(tid)
+            if t and t.tier == TitleTier.COUNTY and t.counties:
+                counties_to_transfer.extend(list(t.counties))
+        
+        if counties_to_transfer:
+            random.shuffle(counties_to_transfer)
+            transfer_count = min(len(counties_to_transfer), random.randint(1, 2))
+            for i in range(transfer_count):
+                cid = counties_to_transfer[i]
+                self.world.occupy_county(cid, winner)
+                county = self.world.map.get(cid)
+                if county:
+                    self.world.push_log(f"?????{county.name} ???")
+
+    def transfer_one_county(self, frm: int, to: int) -> None:
+        loser = self.world.character(frm)
+        if not loser:
+            return
+        for tid in list(loser.held_titles):
+            t = self.world.title(tid)
+            if t and t.tier == TitleTier.COUNTY and t.counties:
+                # ???????? holder + ?????
+                for cid in list(t.counties):
+                    self.world.occupy_county(cid, to)
+                self.world.push_log(f"?????{t.name}")
+                return
+
+    def print_status(self) -> None:
+        print(f"??: {self.world.date}")
+        print(
+            f"??: {sum(1 for _ in self.world.alive_characters())} ?? / "
+            f"{len(self.world.characters)} ??"
+        )
+        print(f"???: {sum(1 for _ in self.world.rulers())}")
+        print(f"???: {len(self.world.map.counties)}")
+        print(f"?????: {sum(1 for _ in self.wars.active_wars())}")
+        print(f"?????: {sum(1 for _ in self.sieges.active_sieges())}")
+        print(f"????: {len(self.factions.factions)}")
+        print(f"?????: {len(self.schemes.schemes)}")
+        print()
+        print("?? ????? ??")
+        for r in self.world.rulers():
+            attrs = self.world.effective_attrs(r.id)
+            title = self.world.title(r.primary_title)
+            tname = title.name if title else "?"
+            income = self.world.monthly_income_of(r.id)
+            men = self.wars.total_men_of(r.id)
+            martial = attrs.martial if attrs else 0
+            profile = AiPersonality.profile_of(self.world, r.id)
+            persona = AiPersonality.describe(profile)
+            print(
+                f"  {r.name} | {tname} | ?:{r.gold:.0f} ??:{r.prestige:.0f} | "
+                f"??:{martial} | ??:{income:.1f} | ???:{men} | [{persona}]"
+            )
+
+    def print_recent_log(self, n: int = 40) -> None:
+        print("\n?? ???? ??")
+        for line in self.world.log[-n:]:
+            print(f"  {line}")
+
+    def print_wars(self) -> None:
+        print("\n?? ?? ??")
+        if not self.wars.wars:
+            print("  ???")
+            return
+        for w in self.wars.wars.values():
+            status = "???" if w.active else "???"
+            an = self.world.character(w.attacker_primary)
+            dn = self.world.character(w.defender_primary)
+            print(
+                f"  [{status}] {w.name} | "
+                f"{(an.name if an else '?')} vs {(dn.name if dn else '?')} | "
+                f"??:{w.warscore} | {w.cb.name_zh()}"
+            )
+
+    def print_politics(self) -> None:
+        print("\n?? ?? ??")
+        if not self.factions.factions:
+            print("  ???")
+        for f in self.factions.factions.values():
+            liege = self.world.character(f.target_liege)
+            print(
+                f"  {f.kind.name_zh()} ? {(liege.name if liege else '?')} | "
+                f"??:{len(f.members)} ??:{f.power:.0f} ??:{f.discontent:.0f}"
+            )
+        print("\n?? ?? ??")
+        if not self.diplomacy.treaties:
+            print("  ???")
+        for t in self.diplomacy.treaties:
+            a = self.world.character(t.a)
+            b = self.world.character(t.b)
+            print(
+                f"  {t.kind.name_zh()} | {(a.name if a else '?')} ? "
+                f"{(b.name if b else '?')} | ? {t.expires_year}"
+            )
+        print("\n?? ?? ??")
+        if not self.schemes.schemes:
+            print("  ???")
+        for s in self.schemes.schemes.values():
+            o = self.world.character(s.owner)
+            t = self.world.character(s.target)
+            print(
+                f"  {s.kind.name_zh()} | {(o.name if o else '?')} ? "
+                f"{(t.name if t else '?')} | ??:{s.progress:.0f}% ??:{s.secrecy:.0f}"
+            )
+
+    def print_dynasties(self) -> None:
+        print("\n?? ?? ??")
+        for d in self.world.dynasties.values():
+            alive = sum(
+                1
+                for m in d.members
+                if self.world.character(m) and self.world.character(m).is_alive()
+            )
+            head = self.world.character(d.head)
+            print(
+                f"  {d.name} | ??:{(head.name if head else '?')} | "
+                f"??:{len(d.members)} (??{alive}) | ??:{d.motto}"
+            )
+
+
+def estimate_power(world: World, who: int) -> int:
+    c = world.character(who)
+    if not c:
+        return 50
+    seen: set = set()
+    total = 0
+    for tid in c.held_titles:
+        t = world.title(tid)
+        if not t:
+            continue
+        for cid in t.counties:
+            if cid in seen:
+                continue
+            seen.add(cid)
+            county = world.map.get(cid)
+            if county:
+                total += county.monthly_levies()
+    return max(50, total)

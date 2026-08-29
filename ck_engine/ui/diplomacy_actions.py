@@ -112,8 +112,8 @@ class DiplomacyActionsMixin:
             raise ValueError("玩家已有配偶")
         if target.is_married():
             raise ValueError("目标已有配偶")
-        if not target.is_adult(w.date):
-            raise ValueError("目标未成年")
+        if not player.is_adult(w.date) or not target.is_adult(w.date):
+            raise ValueError("未成年无法成婚")
         op = w.opinion(target_id, self.player_id)
         if op < 0:
             raise ValueError(f"对方好感不足（当前 {op}）")
@@ -295,6 +295,21 @@ class DiplomacyActionsMixin:
             raise ValueError("无效教育方向")
         child.education_focus = focus
         self.notify(f"已为 {child.name} 选择教育方向：{focus}")
+
+    def _educate_children_yearly(self) -> None:
+        """每年让受教育的未成年子女获得一点对应能力。"""
+        player = self.sim.world.character(self.player_id)
+        if not player:
+            return
+        for child_id in player.children:
+            child = self.sim.world.character(child_id)
+            if not child or not child.is_alive() or child.is_adult(self.sim.world.date):
+                continue
+            focus = child.education_focus
+            if focus and hasattr(child.base_attrs, focus):
+                setattr(child.base_attrs, focus, min(100, getattr(child.base_attrs, focus) + 1))
+                child.education_years += 1
+                self.sim.world.push_log(f"{child.name} 的{focus}教育取得进展")
 
     def _break_engagement(self, child_id: int) -> None:
         """解除婚约。"""

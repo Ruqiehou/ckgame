@@ -89,7 +89,10 @@ class GameAPI(SnapshotMixin, SaveGameMixin, DiplomacyActionsMixin):
                 days = max(1, min(365, days))
                 prev_chunk = self.sim.world.tick // 30
                 self._sync_player()
+                old_year = self.sim.world.date.year
                 self.sim.run_days(days)
+                for _ in range(max(0, self.sim.world.date.year - old_year)):
+                    self._educate_children_yearly()
                 new_chunk = self.sim.world.tick // 30
                 self.notify(f"时间推进 {days} 天 → {self.sim.world.date}")
                 # 自动存档（每 30 天存一次）

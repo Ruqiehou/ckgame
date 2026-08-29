@@ -82,8 +82,12 @@ class Decision:
             return False, "未成年"
         if c.gold < self.min_gold:
             return False, f"金币不足（需 {self.min_gold:.0f}）"
-        if c.prestige < self.min_prestige:
-            return False, f"威望不足（需 {self.min_prestige:.0f}）"
+        if c.prestige < max(self.min_prestige, self.cost_prestige):
+            return False, f"威望不足（需 {max(self.min_prestige, self.cost_prestige):.0f}）"
+        if c.gold < max(self.min_gold, self.cost_gold):
+            return False, f"金币不足（需 {max(self.min_gold, self.cost_gold):.0f}）"
+        if c.piety < self.cost_piety:
+            return False, f"虔诚不足（需 {self.cost_piety:.0f}）"
         if self.requires_duchy and not _has_title_tier(world, who, 2):
             return False, "需公爵及以上头衔"
         if self.requires_kingdom and not _has_title_tier(world, who, 3):
@@ -359,6 +363,8 @@ class DecisionEngine:
     def execute(self, decision_id: str, world, who: int) -> bool:
         d = next((x for x in self.catalog if x.id == decision_id), None)
         if not d:
+            return False
+        if self.cooldowns.get(decision_id, 0) > world.date.year:
             return False
         ok, _ = d.can_execute(world, who)
         if not ok:

@@ -36,6 +36,7 @@ class EventChain:
     participants: List[int] = field(default_factory=list)
     start_date: Optional[GameDate] = None
     current_stage: int = 0
+    stage_started: Optional[GameDate] = None
     active: bool = False
     completed: bool = False
     checker: Optional[Callable] = None  # 是否可触发
@@ -273,11 +274,14 @@ class ChainEngine:
         for chain in self.active_chains:
             if chain.completed:
                 continue
-            # 每月检查一次推进
-            if world.date.day == 1:
+            stage = chain.stages[chain.current_stage] if chain.stages else None
+            started = chain.stage_started or chain.start_date
+            if stage and started and world.date.to_ordinal() - started.to_ordinal() >= stage.days_to_next:
+                if stage.on_timeout:
+                    stage.on_timeout(world, who)
                 chain.advance(world, who)
-            if not chain.completed:
+            if chain.completed:
+                self.history.append(f"{world.date}: 事件链「{chain.title}」完成")
+            else:
                 still_active.append(chain)
-                if chain.completed:
-                    self.history.append(f"{world.date}: 事件链「{chain.title}」完成")
         self.active_chains = still_active

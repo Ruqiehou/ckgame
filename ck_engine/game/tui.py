@@ -1252,7 +1252,8 @@ class GameTUI(TUIViewMixin):
                 elif c.betrothed_to != NONE_ID:
                     bt = self.api.sim.world.character(c.betrothed_to)
                     status = f" ← 订婚{bt.name if bt else '?'}"
-                print(f"    {c.name}（{c.age_at(self.api.sim.world.date)}岁）{status}")
+                education = f"，教育：{c.education_focus}（{c.education_years}年）" if c.education_focus else ""
+                print(f"    {c.name}（{c.age_at(self.api.sim.world.date)}岁{education}）{status}")
         else:
             print("\n  子女：无")
         print("\n  输入子嗣编号可为其安排联姻，按回车返回。")

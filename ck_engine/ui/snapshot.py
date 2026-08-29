@@ -359,6 +359,7 @@ class SnapshotMixin:
                 "status": status,
                 "education_focus": c.education_focus or None,
                 "education_focus_name": focus_names.get(c.education_focus),
+                "education_years": c.education_years,
             })
         return {"spouses": spouses, "children": children}
 
