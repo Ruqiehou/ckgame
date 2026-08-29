@@ -9,7 +9,7 @@ from ck_engine.ai import AiDirector, AiPersonality
 from ck_engine.core import NONE_ID, Season
 from ck_engine.events import EventEngine
 from ck_engine.events.storylines import StorylineSystem, builtin_storylines
-from ck_engine.game.scenario import Scenario1066
+from ck_engine.game.scenario_loader import DEFAULT_SCENARIO, load_scenario
 from ck_engine.military import (
     ArmyStatus,
     BattleSimulator,

@@ -83,6 +83,7 @@ class SaveGameMixin:
             "date": [w.date.year, w.date.month, w.date.day],
             "tick": w.tick,
             "player_id": self.player_id,
+            "scenario": sim.scenario_id,
             "characters": {
                 str(c.id): {
                     "gold": c.gold,

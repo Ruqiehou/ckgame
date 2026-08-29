@@ -32,8 +32,8 @@ class GameAPI(SnapshotMixin, SaveGameMixin, DiplomacyActionsMixin):
     CHEAT_PRESTIGE = 99999.0
     CHEAT_PIETY = 99999.0
 
-    def __init__(self) -> None:
-        self.sim = GameSimulation()
+    def __init__(self, scenario: str | None = None) -> None:
+        self.sim = GameSimulation(scenario)
         self.player_id = self._default_player()
         self.sim.player_ids = {self.player_id}
         self.selected_county: Optional[int] = None

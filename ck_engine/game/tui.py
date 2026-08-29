@@ -16,6 +16,7 @@ ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from ck_engine.game.scenario_loader import list_scenarios
 from ck_engine.politics.laws import CrownAuthority, GenderLaw, SuccessionLaw
 from ck_engine.ui.api import GameAPI
 from ck_engine.world.buildings import BuildingKind
@@ -23,8 +24,8 @@ from ck_engine.game.tui_views import TUIViewMixin, clear, pause
 
 
 class GameTUI(TUIViewMixin):
-    def __init__(self) -> None:
-        self.api = GameAPI()
+    def __init__(self, scenario: str | None = None) -> None:
+        self.api = GameAPI(scenario)
         self.save_dir = ROOT / "saves"
         self.save_dir.mkdir(exist_ok=True)
 
@@ -788,13 +789,38 @@ class GameTUI(TUIViewMixin):
         pause()
 
     # ---------- 新游戏 ----------
+    def _pick_scenario(self) -> str | None:
+        """列出可选场景供玩家选择，返回场景 id；取消返回 None。"""
+        scenarios = list_scenarios()
+        if not scenarios:
+            print("  data/scenarios 下没有可用场景")
+            return None
+        print("\n  可选场景：")
+        for i, s in enumerate(scenarios, 1):
+            desc = f" — {s['description']}" if s["description"] else ""
+            print(f"    {i}. {s['name']} ({s['id']}){desc}")
+        cur = self.api.sim.scenario_id
+        raw = input(f"  选择 [回车保持当前: {cur}] > ").strip()
+        if not raw:
+            return cur
+        if raw.isdigit() and 1 <= int(raw) <= len(scenarios):
+            return scenarios[int(raw) - 1]["id"]
+        if any(s["id"] == raw for s in scenarios):
+            return raw
+        print("  无效选择，保持当前场景")
+        return cur
+
     def _action_new_game(self) -> None:
         self.render("新游戏")
+        scenario = self._pick_scenario()
+        if scenario is None:
+            pause()
+            return
         print("\n  开始新游戏将丢失当前进度（已有存档不受影响）。确认？(y/n)")
         if input("> ").strip().lower() not in ("y", "yes", "是"):
             return
-        self.api.action({"action": "new_game"})
-        print("\n  新局开始")
+        self.api.action({"action": "new_game", "scenario": scenario})
+        print(f"\n  新局开始（场景：{scenario}）")
         pause()
 
     # ---------- 切换玩家 ----------
@@ -1191,7 +1217,20 @@ class GameTUI(TUIViewMixin):
 
 
 def main() -> None:
-    tui = GameTUI()
+    scenario = sys.argv[1] if len(sys.argv) > 1 else None
+    if scenario is None:
+        scenarios = list_scenarios()
+        if scenarios:
+            print("可选场景：")
+            for i, s in enumerate(scenarios, 1):
+                desc = f" — {s['description']}" if s["description"] else ""
+                print(f"  {i}. {s['name']} ({s['id']}){desc}")
+            raw = input("选择场景 [回车默认 1066] > ").strip()
+            if raw.isdigit() and 1 <= int(raw) <= len(scenarios):
+                scenario = scenarios[int(raw) - 1]["id"]
+            elif raw:
+                scenario = raw
+    tui = GameTUI(scenario)
     tui.run()
 
 
