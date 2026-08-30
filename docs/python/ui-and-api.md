@@ -6,9 +6,9 @@
 
 - 信息查看：状态概览、角色详情、伯爵领列表/详情、军队、战争、宣称、条约、统治者、围城、日志、ASCII 地图
 - 军事行动：征召、移动、解散军队；宣战、议和
-- 内政：内阁任命与任务分配、阴谋发起、法律变更、建筑建造与领地发展
+- 内政：内阁任命与任务分配、阴谋发起、法律变更、建筑建造与领地发展、重大决策执行、子女教育与婚约管理
 - 外交：结盟、互不侵犯、附庸、贸易协定、情报共享、联姻、赠礼、宿敌、邀请入宫廷、宴会、决斗
-- 系统：推进时间、切换角色、存档管理、作弊开关
+- 系统：推进时间、切换角色、存档管理、教程、作弊开关
 
 事件弹出时由 TUI 展示选项并调用 `resolve_event` 处理；派系最后通牒挂起时由 TUI 弹出接受/拒绝菜单，调用 `respond_ultimatum` 处理。
 
@@ -18,7 +18,7 @@
 
 ### 状态
 
-- `snapshot()`：返回完整游戏快照，包含 `player`、`date`、`season`、`characters`、`counties`、`armies`、`wars`、`claims`、`treaties`、`pending_events`、`pending_ultimatums`、`log` 等字段。
+- `snapshot()`：返回完整游戏快照，包含 `player`、`date`、`season`、`characters`、`counties`、`armies`、`wars`、`claims`、`treaties`、`pending_events`、`pending_ultimatums`、`decisions`（可执行的重大决策）、`chains`（事件链进度）、`tutorial`、`log` 等字段。
 
 ### 操作
 
@@ -49,6 +49,10 @@
 - `resolve_event`：处理弹出事件
 - `respond_ultimatum`：回应派系最后通牒（`{"action": "respond_ultimatum", "faction_id": 1, "accept": true}`；接受则落实诉求，拒绝则立即叛乱）
 - `appease_faction`：安抚派系
+- `execute_decision`：执行重大决策（如 `{"action": "execute_decision", "id": "hold_tournament"}`；不满足条件或冷却中会报错）
+- `arrange_marriage` / `arrange_child_marriage` / `break_engagement`：联姻与婚约管理
+- `set_child_education`：为未成年子女指定教育方向（`{"action": "set_child_education", "child_id": 5, "focus": "martial"}`）
+- `tutorial_next` / `tutorial_skip`：教程推进与跳过
 
 ## 地图
 

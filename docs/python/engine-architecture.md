@@ -7,10 +7,10 @@ ck_engine/
   ai/           - AI 行为与决策
   core/         - 基础类型、平衡常量、日期
   data/         - 地图布局与场景数据
-  events/       - 事件引擎与剧情
+  events/       - 事件引擎、多阶段事件链与剧情
   game/         - 模拟循环、场景加载、TUI 入口
   military/     - 军团、战斗、围城、战争
-  politics/     - 法律、内阁、外交、派系、阴谋
+  politics/     - 法律、内阁、外交、派系、阴谋、重大决策
   ui/           - GameAPI、地图布局、教程
   world/        - 角色、头衔、地图、世界状态
 ```

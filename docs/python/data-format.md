@@ -6,16 +6,20 @@
 
 主要字段：
 
-- `world`：世界状态
-- `wars`：进行中战争
-- `sieges`：围城状态
-- `factions`：派系
-- `schemes`：阴谋
-- `diplomacy`：外交关系
-- `councils`：内阁
-- `realm_laws`：法律
+- `date` / `tick`：当前日期与帧计数
+- `scenario`：场景 id（读档时按场景重建初始世界再覆盖动态状态）
 - `player_id`：当前玩家
-- `date`：当前日期
+- `characters`：人物动态状态（资源、健康、亲属、持有头衔、婚约、教育方向与受教育年数、特质、好感缓存等）
+- `counties`：省份持有者、控制度、发展度与建筑
+- `titles`：头衔持有者与法理层级
+- `wars` / `armies` / `sieges`：战争（含参战方与战争分数）、军团、围城
+- `diplomacy`：关系标记、条约、宣称、停战、战争疲劳
+- `factions` / `pending_ultimatums`：派系与挂起的最后通牒
+- `schemes`：进行中的阴谋
+- `councils`：内阁成员与任务分配
+- `decisions`：重大决策的冷却与历史记录
+- `chains`：事件链进度（id、是否激活/完成、当前阶段、参与者、开始日期与阶段起始日）
+- `log` / `messages`：近期日志与消息
 
 ## 场景
 

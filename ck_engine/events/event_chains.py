@@ -51,6 +51,7 @@ class EventChain:
     def start(self, world, who: int) -> None:
         self.active = True
         self.start_date = world.date
+        self.stage_started = world.date
         self.participants = [who]
         self.current_stage = 0
         if self.stages and self.stages[0].on_enter:
@@ -63,6 +64,7 @@ class EventChain:
             self.complete(world, who)
             return
         self.current_stage += 1
+        self.stage_started = world.date
         stage = self.stages[self.current_stage]
         if stage.on_enter:
             stage.on_enter(world, who)
@@ -235,10 +237,140 @@ def _dynasty_founding_chain() -> EventChain:
     )
 
 
+def _pretender_chain() -> EventChain:
+    """王位觊觎者：一位野心家觊觎你的统治，最终走向武装叛乱。"""
+    def check(world, who: int) -> bool:
+        c = world.character(who)
+        if not c or not c.is_ruler:
+            return False
+        if c.age_at(world.date) < 30:
+            return False
+        # 威望低迷或健康不佳的君主更易招致觊觎
+        return c.prestige < 120 or c.health < 60
+
+    def stage1_enter(world, who: int) -> None:
+        c = world.character(who)
+        world.push_log("【王位觊觎者】有传言称一名贵族正在暗中收买封臣、觊觎王位。")
+        if c:
+            c.add_stress(8)
+
+    def stage2_enter(world, who: int) -> None:
+        c = world.character(who)
+        world.push_log("【王位觊觎者】觊觎者公然亮出旗帜，纠集反对派向你施压。")
+        if c:
+            c.add_prestige(-10)
+            c.add_stress(10)
+
+    def stage3_enter(world, who: int) -> None:
+        c = world.character(who)
+        world.push_log("【王位觊觎者】觊觎者举兵叛乱，你必须镇压！")
+        if c:
+            c.add_gold(-80)
+            c.add_prestige(25)
+            c.add_stress(15)
+
+    return EventChain(
+        id="pretender_rising",
+        title="王位觊觎者",
+        description="一名野心贵族觊觎王位，意图颠覆你的统治。",
+        checker=check,
+        stages=[
+            ChainStage(
+                id="pr_1",
+                title="暗流涌动",
+                description="谣言四起，有人图谋不轨。",
+                days_to_next=180,
+                on_enter=stage1_enter,
+            ),
+            ChainStage(
+                id="pr_2",
+                title="公开挑战",
+                description="觊觎者集结势力，公开挑战你的权威。",
+                days_to_next=240,
+                on_enter=stage2_enter,
+            ),
+            ChainStage(
+                id="pr_3",
+                title="叛乱爆发",
+                description="叛乱爆发，你以武力镇压，付出代价并赢回声望。",
+                days_to_next=365,
+                on_enter=stage3_enter,
+            ),
+        ],
+    )
+
+
+def _great_famine_chain() -> EventChain:
+    """大饥荒：连年歉收引发饥荒，考验你的施政。"""
+    import random
+
+    def check(world, who: int) -> bool:
+        c = world.character(who)
+        if not c or not c.is_ruler:
+            return False
+        # 低概率触发，且要求领内控制度一般
+        return random.random() < 0.03
+
+    def stage1_enter(world, who: int) -> None:
+        c = world.character(who)
+        world.push_log("【大饥荒】今夏干旱，秋粮减产，谷价飞涨。")
+        if c:
+            c.add_gold(-30)
+            c.add_stress(12)
+
+    def stage2_enter(world, who: int) -> None:
+        c = world.character(who)
+        world.push_log("【大饥荒】饥荒蔓延，流民涌入城镇，民心日益不稳。")
+        if c:
+            c.add_gold(-50)
+            c.add_prestige(-15)
+            c.add_stress(18)
+
+    def stage3_enter(world, who: int) -> None:
+        c = world.character(who)
+        world.push_log("【大饥荒】你开仓赈济，熬过了最艰难的时节，威望渐复。")
+        if c:
+            c.add_gold(-40)
+            c.add_prestige(20)
+            c.add_stress(-10)
+
+    return EventChain(
+        id="great_famine",
+        title="大饥荒",
+        description="连年歉收令领地陷入饥荒，需艰难应对。",
+        checker=check,
+        stages=[
+            ChainStage(
+                id="gf_1",
+                title="谷物歉收",
+                description="旱灾袭来，收成锐减。",
+                days_to_next=180,
+                on_enter=stage1_enter,
+            ),
+            ChainStage(
+                id="gf_2",
+                title="饥荒蔓延",
+                description="饥荒席卷领地，流民四起。",
+                days_to_next=270,
+                on_enter=stage2_enter,
+            ),
+            ChainStage(
+                id="gf_3",
+                title="赈济复苏",
+                description="开仓放粮，领地艰难复苏。",
+                days_to_next=365,
+                on_enter=stage3_enter,
+            ),
+        ],
+    )
+
+
 BUILTIN_CHAINS: List[EventChain] = [
     _norman_conquest_chain(),
     _succession_crisis_chain(),
     _dynasty_founding_chain(),
+    _pretender_chain(),
+    _great_famine_chain(),
 ]
 
 

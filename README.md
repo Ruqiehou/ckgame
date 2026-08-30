@@ -1,32 +1,28 @@
 # CK-Style Grand Strategy Engine
 
-十字军之王风格大战略模拟引擎，提供两个语言实现。  
+十字军之王风格大战略模拟引擎（Python 实现）。  
 默认场景：**1066 英格兰**（诺曼征服前夜）。
 
 作者：Ruqiehou  
-更新：2026-08-28
+更新：2026-08-30
 
 ---
 
-## 两个版本
+## 快速开始
 
-| 版本 | 目录 | 环境 | 快速开始 |
-|------|------|------|----------|
-| Python | `ck_engine/` | Python 3.10+，标准库 | `python -m ck_engine.game.tui` |
-| Java | `ckgame-java/` | Java 17+，Maven + Jackson | `mvn clean package && java -jar ckgame-java/target/ck-game.jar` |
+| 环境 | 快速开始 |
+|------|----------|
+| Python 3.10+，标准库 | `python -m ck_engine.game.tui` |
 
-两个版本共享同一套机制设计：`GameSimulation` 主循环（按日推进、月度结算）+ `GameAPI` 统一接口（snapshot/action）+ TUI 命令行文字界面，存档均为 JSON（`saves/` 目录）。
+架构：`GameSimulation` 主循环（按日推进、月度结算）+ `GameAPI` 统一接口（snapshot/action）+ TUI 命令行文字界面，存档为 JSON（`saves/` 目录）。
 
 ---
 
 ## 文档
 
-统一文档位于 [docs/](docs/README.md)，按版本分子目录：
+统一文档位于 [docs/](docs/README.md)，当前为 Python 版：
 
-- [docs/python/](docs/python/README.md) — Python 版
-- [docs/java/](docs/java/README.md) — Java 版
-
-每版包含：引擎架构、游戏机制、UI 与接口、数据格式、开发者指南。
+- [docs/python/](docs/python/README.md) — 引擎架构、游戏机制、UI 与接口、数据格式、开发者指南
 
 ---
 
@@ -36,13 +32,13 @@
 |------|------|
 | 世界 | 人物、王朝、头衔、邻接地图、税收/征召、生育、死亡与继承 |
 | 法律 | 继承法（长子/幼子/选举等）、王权等级、性别法 |
-| 政治 | 外交（同盟/停战/联姻）、内阁任务、派系、阴谋 |
+| 政治 | 外交（同盟/停战/联姻/婚约）、内阁任务、派系、阴谋 |
 | 军事 | 征召、行军、战斗、围城、占城同步头衔、战争分数与和约 |
-| 事件 | 月度触发与 AI 自动决议 |
+| 事件 | 32 个内置事件（月度触发）+ 5 条多阶段事件链（诺曼征服、继承危机、王朝奠基、王位觊觎者、大饥荒） |
+| 决策 | 8 个重大决策（加冕为王、迁都、号召圣战、举办比武大会、改革信仰、重建帝国、巡游领地、颁授特许状） |
+| 家族 | 未成年子女教育方向与年度教育成长、婚约 |
 | AI | 宣战、结盟、婚姻、宴会、发展、阴谋 |
 | 场景 | 14 省、英格兰/诺曼底主要贵族 |
-
-注：各版本功能完成度略有差异，详见对应版本文档。
 
 ---
 
