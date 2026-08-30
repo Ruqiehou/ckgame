@@ -178,6 +178,8 @@ class GameAPI(SnapshotMixin, SaveGameMixin, DiplomacyActionsMixin):
                 )
             elif kind == "execute_decision":
                 self._execute_decision(payload.get("decision_id"))
+            elif kind == "gameplay_action":
+                self._gameplay_action(payload.get("gameplay"), payload.get("op"))
             elif kind == "appoint_council":
                 self._appoint_council(payload.get("position"), int(payload.get("character_id", NONE_ID)))
             elif kind == "assign_council_task":
@@ -286,6 +288,16 @@ class GameAPI(SnapshotMixin, SaveGameMixin, DiplomacyActionsMixin):
             self.notify(f"已执行决策「{decision_id}」")
         else:
             raise ValueError(f"决策「{decision_id}」不可执行")
+
+    def _gameplay_action(self, gameplay_id: Any, op: Any) -> None:
+        """执行玩法目录中的玩家操作（狩猎、养生等）。"""
+        if not gameplay_id or not op:
+            raise ValueError("缺少 gameplay 或 op")
+        msg = self.sim.gameplays.perform(
+            self.sim, self.player_id, str(gameplay_id), str(op)
+        )
+        self.notify(msg)
+        self._grant_action_xp(10)
 
     def _player_laws(self) -> Dict[str, Any]:
         w = self.sim.world

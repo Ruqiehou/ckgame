@@ -4,6 +4,7 @@
 
 - [引擎架构](engine-architecture.md)：项目结构与核心流程
 - [游戏机制](game-mechanics.md)：战争、派系、法律、阴谋等机制
+- [玩法目录](gameplay.md)：玩法系统清单（狩猎、养生）与扩展方式
 - [UI 与接口](ui-and-api.md)：TUI 文字界面与 GameAPI
 - [数据格式](data-format.md)：存档与场景数据格式
 - [开发者指南](developer-guide.md)：环境搭建与运行方式

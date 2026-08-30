@@ -183,6 +183,7 @@ class SaveGameMixin:
                 "cooldowns": dict(sim.decisions.cooldowns),
                 "history": list(sim.decisions.history),
             },
+            "gameplays": sim.gameplays.save_state(),
             "chains": [
                 {
                     "id": chain.id,
@@ -391,6 +392,9 @@ class SaveGameMixin:
             str(k): int(v) for k, v in decision_data.get("cooldowns", {}).items()
         }
         sim.decisions.history = list(decision_data.get("history", []))
+
+        # 恢复玩法状态（狩猎冷却、宫廷医师等）
+        sim.gameplays.load_state(data.get("gameplays", {}))
         chain_rows = {row.get("id"): row for row in data.get("chains", [])}
         sim.chains.active_chains.clear()
         for chain in sim.chains.chains:

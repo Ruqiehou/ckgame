@@ -281,6 +281,7 @@ class SnapshotMixin:
             "exchange_rates": w.exchange_rates,
             "trade_events": w.trade_events,
             "decisions": self._player_decisions(),
+            "gameplays": self._gameplays(),
             "chains": self._player_chains(),
             "family": self._player_family(),
         }
@@ -300,6 +301,13 @@ class SnapshotMixin:
                 "cost_prestige": d.cost_prestige,
             })
         return out
+
+    def _gameplays(self) -> Dict[str, Any]:
+        """玩法目录与玩家在各玩法中的状态。"""
+        return {
+            "catalog": self.sim.gameplays.catalog(),
+            "player": self.sim.gameplays.player_state(self.sim, self.player_id),
+        }
 
     def _player_chains(self) -> List[Dict[str, Any]]:
         """返回活跃事件链。"""

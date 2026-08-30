@@ -10,6 +10,7 @@ from ck_engine.core import NONE_ID, Season
 from ck_engine.events import EventEngine
 from ck_engine.events.event_chains import ChainEngine, builtin_chains
 from ck_engine.events.storylines import StorylineSystem, builtin_storylines
+from ck_engine.gameplay import GameplayManager
 from ck_engine.politics.decisions import DecisionEngine
 from ck_engine.game.scenario_loader import DEFAULT_SCENARIO, load_scenario
 from ck_engine.military import (
@@ -59,6 +60,7 @@ class GameSimulation:
         self.storylines = StorylineSystem()
         self.decisions = DecisionEngine()
         self.chains = ChainEngine(builtin_chains())
+        self.gameplays = GameplayManager()
         self.realm_laws: Dict[int, RealmLaw] = {}
         self.player_ids: set = set()
         self.pending_ultimatums: Dict[int, PendingUltimatum] = {}
@@ -240,6 +242,9 @@ class GameSimulation:
         for r in list(self.world.rulers()):
             self.ensure_council(r.id)
             self.realm_laws.setdefault(r.id, RealmLaw.feudal_default())
+
+        # 玩法目录：狩猎、养生等玩法的月度结算
+        self.gameplays.tick_month(self)
 
     def _process_family(self) -> None:
         """结算子女教育，并让已成年的婚约双方自动成婚。"""

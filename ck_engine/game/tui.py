@@ -180,6 +180,8 @@ class GameTUI(TUIViewMixin):
                 self._show_family_tree()
             elif cmd == "decisions":
                 self._menu_decisions()
+            elif cmd == "gameplay":
+                self._menu_gameplays()
             elif cmd == "chains":
                 self._show_chains()
             elif cmd == "new":
@@ -214,6 +216,7 @@ class GameTUI(TUIViewMixin):
         print("  claim     伪造宣称    grant    授予头衔    laws    更改法律")
         print("  council   内阁管理    schemes  阴谋活动    diplomacy 外交")
         print("  family    家族树      decisions 重大决策    chains   事件链")
+        print("  gameplay  玩法目录")
         print("  player    切换玩家    new      新游戏      advance  推进时间")
         print("  save      存档        load     读档        cheat    作弊")
         print("  help      帮助        exit     退出")
@@ -1363,6 +1366,71 @@ class GameTUI(TUIViewMixin):
         self.api.action({"action": "execute_decision", "decision_id": dec["id"]})
         print(f"  已执行决策「{dec['title']}」")
         pause()
+
+    # ---------- 玩法目录 ----------
+    def _menu_gameplays(self) -> None:
+        """玩法目录：查看玩法清单并执行玩法操作。"""
+        snap = self.api.snapshot()
+        gp = snap.get("gameplays", {})
+        print("\n—— 玩法目录 ——")
+        for entry in gp.get("catalog", []):
+            mark = "●" if entry.get("status") == "active" else "○"
+            print(f"  {mark} {entry['name']}（{entry['category']}）— {entry['description']}")
+        player_rows = gp.get("player", [])
+        if not player_rows:
+            pause()
+            return
+        gold = snap.get("player", {}).get("gold", 0)
+        rows = []
+        for sysrow in player_rows:
+            state = sysrow.get("state", {})
+            for act in sysrow.get("actions", []):
+                rows.append((sysrow, act, state, self._gameplay_op_available(sysrow, act, state, gold)))
+        print("\n—— 玩法操作 ——")
+        for i, (sysrow, act, _state, reason) in enumerate(rows, 1):
+            tag = "✓" if reason == "" else "✗"
+            print(f"  {i}. {tag} [{sysrow['name']}] {act['name']}")
+            print(f"     {act.get('desc', '')}")
+            if reason:
+                print(f"     前提：{reason}")
+        print("\n  输入编号执行操作，0 返回。")
+        raw = input("> ").strip()
+        if raw == "0" or not raw.isdigit():
+            return
+        idx = int(raw)
+        if not (1 <= idx <= len(rows)):
+            print("  无效编号")
+            pause()
+            return
+        sysrow, act, _state, reason = rows[idx - 1]
+        if reason:
+            print(f"  不可执行：{reason}")
+            pause()
+            return
+        self.api.action(
+            {"action": "gameplay_action", "gameplay": sysrow["id"], "op": act["op"]}
+        )
+        print(f"  {self.api.messages[-1]}")
+        pause()
+
+    @staticmethod
+    def _gameplay_op_available(sysrow: dict, act: dict, state: dict, gold: float) -> str:
+        """根据快照状态粗判玩法操作是否可执行，返回不可执行原因。"""
+        op = act.get("op", "")
+        cost = float(act.get("cost_gold", 0) or 0)
+        if sysrow["id"] == "hunting" and op == "organize":
+            cd = state.get("cooldown_months", 0)
+            if cd > 0:
+                return f"猎场尚未休整（还需 {cd} 个月）"
+        elif sysrow["id"] == "wellness":
+            hired = state.get("has_physician", False)
+            if op == "hire_physician" and hired:
+                return "已有医师在宫中"
+            if op == "dismiss_physician" and not hired:
+                return "宫中没有医师"
+        if gold < cost:
+            return f"金币不足（需 {cost:.0f}）"
+        return ""
 
     def _show_chains(self) -> None:
         """显示活跃事件链。"""
