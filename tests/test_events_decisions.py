@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 import unittest
 
-from ck_engine.events.engine import builtin_events
+from ck_engine.events.engine import EventEngine, EventInstance, builtin_events
 from ck_engine.events.event_chains import BUILTIN_CHAINS, ChainEngine, builtin_chains
 from ck_engine.game.simulation import GameSimulation
 from ck_engine.politics.decisions import BUILTIN_DECISIONS
@@ -18,8 +18,27 @@ class EventsCatalogTest(unittest.TestCase):
 
     def test_new_events_present(self) -> None:
         ids = {e.id for e in builtin_events()}
-        for i in (33, 34, 35, 36):
+        for i in range(37, 47):
             self.assertIn(i, ids)
+
+    def test_new_events_have_choices_and_effects(self) -> None:
+        events = [event for event in builtin_events() if 37 <= event.id <= 46]
+        self.assertEqual(len(events), 10)
+        for event in events:
+            self.assertGreaterEqual(len(event.choices), 2)
+            self.assertTrue(any(choice.effects for choice in event.choices))
+
+    def test_coinage_event_choice_applies_effects(self) -> None:
+        simulation = GameSimulation()
+        ruler = next(iter(simulation.world.rulers()))
+        character = simulation.world.character(ruler.id)
+        event = next(event for event in builtin_events() if event.id == 38)
+        instance = EventInstance(event.id, ruler.id, event.title, event.description, event.choices)
+        before_gold = character.gold
+        before_prestige = character.prestige
+        EventEngine().resolve_choice(simulation.world, instance, 1)
+        self.assertEqual(character.gold, before_gold + 45)
+        self.assertEqual(character.prestige, before_prestige - 18)
 
 
 class DecisionsTest(unittest.TestCase):

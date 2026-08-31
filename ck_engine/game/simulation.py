@@ -83,6 +83,31 @@ class GameSimulation:
             )
             if eng:
                 self.diplomacy.add_claim(william, eng, strength=80)
+
+        if self.scenario_id == "867":
+            alfred = next(
+                (c.id for c in self.world.alive_characters() if "阿尔弗雷德" in c.name),
+                None,
+            )
+            ivar = next(
+                (c.id for c in self.world.alive_characters() if "无骨者伊瓦尔" in c.name),
+                None,
+            )
+            burgred = next(
+                (c.id for c in self.world.alive_characters() if "伯格雷德" in c.name),
+                None,
+            )
+            wessex = next(
+                (t.id for t in self.world.titles.values() if t.name == "威塞克斯王国"),
+                None,
+            )
+            if alfred and ivar:
+                self.diplomacy.set_rival(alfred, ivar)
+                if wessex:
+                    self.diplomacy.add_claim(ivar, wessex, strength=90)
+            if alfred and burgred:
+                self.diplomacy.form_alliance(alfred, burgred, self.world.date)
+
         edwin = next((c.id for c in self.world.alive_characters() if "埃德温" in c.name), None)
         morcar = next((c.id for c in self.world.alive_characters() if "莫卡" in c.name), None)
         if edwin and morcar:

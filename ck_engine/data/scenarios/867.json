@@ -1,0 +1,61 @@
+{
+  "meta": {"name": "867 维京大军", "description": "异教大军席卷英格兰：守住威塞克斯，或以北欧诸王征服全岛"},
+  "start_date": [867, 1, 1],
+  "dynasties": [
+    {"key": "wessex", "name": "威塞克斯", "color": [205, 165, 45], "motto": "西撒克逊永不屈服"},
+    {"key": "ragnar", "name": "洛德布罗克", "color": [40, 100, 145], "motto": "以血偿血"},
+    {"key": "mercia", "name": "麦西亚", "color": [65, 145, 75], "motto": "守护中部"},
+    {"key": "northumbria", "name": "诺森布里亚", "color": [115, 90, 145], "motto": "北境王冠"},
+    {"key": "danelaw", "name": "丹麦律法区", "color": [45, 125, 135], "motto": "剑锋即法律"}
+  ],
+  "counties": [
+    {"key": "winchester", "name": "温切斯特", "terrain": "FARMLAND", "development": 18, "levies": 380, "tax": 1.7, "fort": 3},
+    {"key": "somerset", "name": "萨默塞特", "terrain": "HILLS", "development": 12, "levies": 250, "tax": 1.1, "fort": 2},
+    {"key": "kent", "name": "肯特", "terrain": "COASTAL", "development": 16, "levies": 280, "tax": 1.5, "fort": 2, "has_port": true, "port_level": 2},
+    {"key": "mercia", "name": "麦西亚", "terrain": "FARMLAND", "development": 14, "levies": 310, "tax": 1.3, "fort": 2},
+    {"key": "east_anglia", "name": "东盎格利亚", "terrain": "WETLAND", "development": 13, "levies": 290, "tax": 1.2, "fort": 1, "has_port": true, "port_level": 1},
+    {"key": "york", "name": "约克", "terrain": "PLAINS", "development": 17, "levies": 420, "tax": 1.5, "fort": 3, "trade_route_maintenance_level": 1},
+    {"key": "northumbria", "name": "诺森布里亚", "terrain": "HILLS", "development": 10, "levies": 230, "tax": 0.9, "fort": 2},
+    {"key": "lincoln", "name": "林肯", "terrain": "PLAINS", "development": 14, "levies": 330, "tax": 1.2, "fort": 2, "has_port": true, "port_level": 1}
+  ],
+  "connections": [["winchester", "somerset"], ["winchester", "kent"], ["winchester", "mercia"], ["kent", "east_anglia"], ["mercia", "east_anglia"], ["mercia", "lincoln"], ["east_anglia", "lincoln"], ["lincoln", "york"], ["york", "northumbria"]],
+  "trade_routes": [
+    {"from": "kent", "to": "east_anglia", "trade_volume": 110, "exchange_rate": 1.1},
+    {"from": "lincoln", "to": "york", "trade_volume": 140, "exchange_rate": 1.2},
+    {"from": "winchester", "to": "kent", "trade_volume": 100, "exchange_rate": 1.0}
+  ],
+  "titles": [
+    {"key": "k_wessex", "name": "威塞克斯王国", "tier": "KINGDOM"},
+    {"key": "k_danelaw", "name": "丹麦律法区", "tier": "KINGDOM"},
+    {"key": "d_mercia", "name": "麦西亚公国", "tier": "DUCHY"},
+    {"key": "d_north", "name": "诺森布里亚公国", "tier": "DUCHY"},
+    {"key": "c_winchester", "name": "温切斯特伯爵领", "tier": "COUNTY"},
+    {"key": "c_somerset", "name": "萨默塞特伯爵领", "tier": "COUNTY"},
+    {"key": "c_kent", "name": "肯特伯爵领", "tier": "COUNTY"},
+    {"key": "c_mercia", "name": "麦西亚伯爵领", "tier": "COUNTY"},
+    {"key": "c_east", "name": "东盎格利亚伯爵领", "tier": "COUNTY"},
+    {"key": "c_york", "name": "约克伯爵领", "tier": "COUNTY"},
+    {"key": "c_north", "name": "诺森布里亚伯爵领", "tier": "COUNTY"},
+    {"key": "c_lincoln", "name": "林肯伯爵领", "tier": "COUNTY"}
+  ],
+  "title_counties": {
+    "c_winchester": ["winchester"], "c_somerset": ["somerset"], "c_kent": ["kent"], "c_mercia": ["mercia"], "c_east": ["east_anglia"], "c_york": ["york"], "c_north": ["northumbria"], "c_lincoln": ["lincoln"],
+    "k_wessex": ["winchester", "somerset", "kent"], "k_danelaw": ["east_anglia", "york", "lincoln"], "d_mercia": ["mercia"], "d_north": ["northumbria"]
+  },
+  "vassals": [["c_winchester", "k_wessex"], ["c_somerset", "k_wessex"], ["c_kent", "k_wessex"], ["c_east", "k_danelaw"], ["c_york", "k_danelaw"], ["c_lincoln", "k_danelaw"], ["c_mercia", "d_mercia"], ["c_north", "d_north"]],
+  "characters": [
+    {"key": "alfred", "name": "阿尔弗雷德大帝", "dynasty": "wessex", "gender": "MALE", "birth": [849, 1, 1], "culture": 0, "faith": 0, "attrs": [15, 14, 16, 10, 17, 13], "gold": 180, "prestige": 220, "traits": [1, 3, 8]},
+    {"key": "aelswith", "name": "埃尔斯威丝", "dynasty": "mercia", "gender": "FEMALE", "birth": [852, 1, 1], "culture": 0, "faith": 0},
+    {"key": "ivar", "name": "无骨者伊瓦尔", "dynasty": "ragnar", "gender": "MALE", "birth": [835, 1, 1], "culture": 2, "faith": 2, "attrs": [10, 17, 12, 18, 8, 15], "gold": 230, "prestige": 380, "traits": [2, 6, 11]},
+    {"key": "halfdan", "name": "白衫哈夫丹", "dynasty": "ragnar", "gender": "MALE", "birth": [838, 1, 1], "culture": 2, "faith": 2, "attrs": [9, 18, 10, 12, 7, 16], "gold": 210, "prestige": 340, "traits": [1, 6, 9]},
+    {"key": "ubba", "name": "乌伯", "dynasty": "ragnar", "gender": "MALE", "birth": [840, 1, 1], "culture": 2, "faith": 2, "attrs": [8, 16, 9, 10, 6, 14], "gold": 130, "prestige": 220, "traits": [1, 6]},
+    {"key": "burgred", "name": "麦西亚的伯格雷德", "dynasty": "mercia", "gender": "MALE", "birth": [830, 1, 1], "culture": 0, "faith": 0, "attrs": [11, 10, 12, 8, 9, 9], "gold": 120, "prestige": 130, "traits": [3]},
+    {"key": "aella", "name": "诺森布里亚的埃拉", "dynasty": "northumbria", "gender": "MALE", "birth": [825, 1, 1], "culture": 0, "faith": 0, "attrs": [8, 11, 8, 7, 8, 10], "gold": 90, "prestige": 100, "traits": [1]},
+    {"key": "guthrum", "name": "古斯鲁姆", "dynasty": "danelaw", "gender": "MALE", "birth": [835, 1, 1], "culture": 2, "faith": 2, "attrs": [12, 15, 11, 13, 8, 13], "gold": 150, "prestige": 210, "traits": [1, 2]}
+  ],
+  "marriages": [["alfred", "aelswith"]],
+  "grants": [["k_wessex", "alfred"], ["c_winchester", "alfred"], ["c_somerset", "alfred"], ["c_kent", "aelswith"], ["k_danelaw", "ivar"], ["c_east", "ivar"], ["c_york", "halfdan"], ["c_lincoln", "guthrum"], ["d_mercia", "burgred"], ["c_mercia", "burgred"], ["d_north", "aella"], ["c_north", "aella"]],
+  "post_grants_vassals": [["c_winchester", "k_wessex"], ["c_somerset", "k_wessex"], ["c_kent", "k_wessex"], ["c_east", "k_danelaw"], ["c_york", "k_danelaw"], ["c_lincoln", "k_danelaw"]],
+  "opinions": [["ivar", "alfred", -65], ["alfred", "ivar", -60], ["halfdan", "alfred", -55], ["alfred", "halfdan", -50], ["ivar", "halfdan", 30], ["ubba", "ivar", 35], ["burgred", "alfred", 20], ["aella", "ivar", -80], ["guthrum", "ivar", 10]],
+  "logs": ["867 年场景已加载：异教大军攻占约克，英格兰诸国各自为战。", "阿尔弗雷德必须联合麦西亚守住南方；伊瓦尔与哈夫丹则要完成复仇与征服。", "玩法目标：建立统一英格兰，或让丹麦律法覆盖整座岛屿。"]
+}

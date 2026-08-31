@@ -1,0 +1,64 @@
+{
+  "meta": {"name": "1453 玫瑰战争", "description": "兰开斯特与约克争夺英格兰王冠：贵族联盟、王位宣称与内战一触即发"},
+  "start_date": [1453, 1, 1],
+  "dynasties": [
+    {"key": "lancaster", "name": "兰开斯特", "color": [180, 35, 45], "motto": "王冠属于合法继承者"},
+    {"key": "york", "name": "约克", "color": [55, 80, 175], "motto": "以权利与剑"},
+    {"key": "tudor", "name": "都铎", "color": [45, 125, 75], "motto": "在乱世中崛起"},
+    {"key": "beaufort", "name": "博福特", "color": [140, 80, 45], "motto": "血脉与野心"},
+    {"key": "neville", "name": "内维尔", "color": [110, 65, 145], "motto": "谁掌握北方，谁决定王冠"}
+  ],
+  "counties": [
+    {"key": "london", "name": "伦敦", "terrain": "FARMLAND", "development": 35, "levies": 520, "tax": 3.0, "fort": 4, "has_port": true, "port_level": 3, "trade_route_protected": true, "trade_route_protection_level": 2, "trade_route_maintenance_level": 2},
+    {"key": "kent", "name": "肯特", "terrain": "COASTAL", "development": 24, "levies": 330, "tax": 1.9, "fort": 3, "has_port": true, "port_level": 2},
+    {"key": "wessex", "name": "威塞克斯", "terrain": "PLAINS", "development": 22, "levies": 310, "tax": 1.7, "fort": 2},
+    {"key": "east_anglia", "name": "东盎格利亚", "terrain": "WETLAND", "development": 23, "levies": 300, "tax": 1.8, "fort": 2, "trade_route_maintenance_level": 1},
+    {"key": "warwick", "name": "沃里克", "terrain": "FARMLAND", "development": 25, "levies": 360, "tax": 2.0, "fort": 3},
+    {"key": "yorkshire", "name": "约克郡", "terrain": "HILLS", "development": 21, "levies": 390, "tax": 1.6, "fort": 3, "trade_route_maintenance_level": 1},
+    {"key": "northumberland", "name": "诺森伯兰", "terrain": "HILLS", "development": 15, "levies": 260, "tax": 1.2, "fort": 3},
+    {"key": "wales", "name": "威尔士边区", "terrain": "HILLS", "development": 12, "levies": 210, "tax": 1.0, "fort": 2}
+  ],
+  "connections": [["london", "kent"], ["london", "wessex"], ["london", "east_anglia"], ["london", "warwick"], ["kent", "wessex"], ["wessex", "wales"], ["warwick", "wales"], ["warwick", "yorkshire"], ["east_anglia", "yorkshire"], ["yorkshire", "northumberland"]],
+  "trade_routes": [
+    {"from": "london", "to": "kent", "trade_volume": 240, "exchange_rate": 1.4},
+    {"from": "london", "to": "east_anglia", "trade_volume": 180, "exchange_rate": 1.2},
+    {"from": "warwick", "to": "yorkshire", "trade_volume": 130, "exchange_rate": 1.1}
+  ],
+  "titles": [
+    {"key": "k_england", "name": "英格兰王国", "tier": "KINGDOM"},
+    {"key": "d_lancaster", "name": "兰开斯特公国", "tier": "DUCHY"},
+    {"key": "d_york", "name": "约克公国", "tier": "DUCHY"},
+    {"key": "d_west", "name": "西部公国", "tier": "DUCHY"},
+    {"key": "d_north", "name": "北方公国", "tier": "DUCHY"},
+    {"key": "c_london", "name": "伦敦伯爵领", "tier": "COUNTY"},
+    {"key": "c_kent", "name": "肯特伯爵领", "tier": "COUNTY"},
+    {"key": "c_wessex", "name": "威塞克斯伯爵领", "tier": "COUNTY"},
+    {"key": "c_east", "name": "东盎格利亚伯爵领", "tier": "COUNTY"},
+    {"key": "c_warwick", "name": "沃里克伯爵领", "tier": "COUNTY"},
+    {"key": "c_yorkshire", "name": "约克郡伯爵领", "tier": "COUNTY"},
+    {"key": "c_north", "name": "诺森伯兰伯爵领", "tier": "COUNTY"},
+    {"key": "c_wales", "name": "威尔士边区伯爵领", "tier": "COUNTY"}
+  ],
+  "title_counties": {
+    "c_london": ["london"], "c_kent": ["kent"], "c_wessex": ["wessex"], "c_east": ["east_anglia"], "c_warwick": ["warwick"], "c_yorkshire": ["yorkshire"], "c_north": ["northumberland"], "c_wales": ["wales"],
+    "d_lancaster": ["london", "kent", "east_anglia"], "d_york": ["yorkshire", "northumberland"], "d_west": ["wessex", "wales"], "d_north": ["warwick", "yorkshire", "northumberland"], "k_england": ["london", "kent", "wessex", "east_anglia", "warwick", "yorkshire", "northumberland", "wales"]
+  },
+  "vassals": [["c_london", "d_lancaster"], ["c_kent", "d_lancaster"], ["c_east", "d_lancaster"], ["c_wessex", "d_west"], ["c_wales", "d_west"], ["c_warwick", "d_north"], ["c_yorkshire", "d_york"], ["c_north", "d_york"], ["d_lancaster", "k_england"], ["d_west", "k_england"], ["d_north", "k_england"], ["d_york", "k_england"]],
+  "characters": [
+    {"key": "henry", "name": "亨利六世", "dynasty": "lancaster", "gender": "MALE", "birth": [1421, 12, 6], "culture": 0, "faith": 0, "attrs": [8, 5, 9, 6, 12, 5], "gold": 260, "prestige": 180, "traits": [3]},
+    {"key": "margaret", "name": "安茹的玛格丽特", "dynasty": "lancaster", "gender": "FEMALE", "birth": [1430, 5, 23], "culture": 0, "faith": 0, "attrs": [14, 8, 8, 12, 8, 7], "gold": 120, "prestige": 150, "traits": [2, 11]},
+    {"key": "edward", "name": "约克的爱德华", "dynasty": "york", "gender": "MALE", "birth": [1442, 4, 28], "culture": 0, "faith": 0, "attrs": [12, 16, 10, 11, 7, 13], "gold": 210, "prestige": 260, "traits": [1, 6]},
+    {"key": "richard", "name": "理查·金雀花", "dynasty": "york", "gender": "MALE", "birth": [1411, 9, 21], "culture": 0, "faith": 0, "attrs": [13, 14, 11, 13, 9, 12], "gold": 180, "prestige": 220, "traits": [1, 2]},
+    {"key": "warwick", "name": "内维尔的理查", "dynasty": "neville", "gender": "MALE", "birth": [1428, 11, 22], "culture": 0, "faith": 0, "attrs": [17, 15, 12, 14, 9, 13], "gold": 240, "prestige": 280, "traits": [1, 6, 9]},
+    {"key": "jasper", "name": "彭布罗克的贾斯珀", "dynasty": "tudor", "gender": "MALE", "birth": [1431, 11, 1], "culture": 0, "faith": 0, "attrs": [13, 12, 10, 10, 8, 9], "gold": 130, "prestige": 140, "traits": [1]},
+    {"key": "henry_tudor", "name": "亨利·都铎", "dynasty": "tudor", "gender": "MALE", "birth": [1457, 1, 28], "culture": 0, "faith": 0},
+    {"key": "edward_wife", "name": "伊丽莎白·伍德维尔", "dynasty": "york", "gender": "FEMALE", "birth": [1437, 2, 3], "culture": 0, "faith": 0},
+    {"key": "richard_son", "name": "中塔的爱德华", "dynasty": "york", "gender": "MALE", "birth": [1470, 11, 2], "culture": 0, "faith": 0}
+  ],
+  "parents": [["richard_son", "edward", "edward_wife"]],
+  "marriages": [["henry", "margaret"], ["edward", "edward_wife"]],
+  "grants": [["k_england", "henry"], ["d_lancaster", "henry"], ["c_london", "henry"], ["c_kent", "margaret"], ["c_east", "henry"], ["d_york", "richard"], ["c_yorkshire", "richard"], ["c_north", "warwick"], ["d_north", "warwick"], ["d_west", "jasper"], ["c_wessex", "jasper"], ["c_wales", "jasper"]],
+  "post_grants_vassals": [["d_lancaster", "k_england"], ["d_york", "k_england"], ["d_north", "k_england"], ["d_west", "k_england"], ["c_kent", "d_lancaster"], ["c_east", "d_lancaster"], ["c_north", "d_york"]],
+  "opinions": [["richard", "henry", -55], ["edward", "henry", -70], ["warwick", "henry", -35], ["margaret", "richard", -45], ["henry", "richard", -30], ["jasper", "henry", -10], ["warwick", "edward", 35], ["richard", "edward", 25], ["margaret", "henry", 40]],
+  "logs": ["1453 年场景已加载：亨利六世的精神状态恶化，王国由摄政与派系控制。", "约克派拥有强大的北方军力，内维尔家族正在等待下注。", "玩法目标：拥立合法王位、控制伦敦，或让都铎家族从乱局中崛起。"]
+}

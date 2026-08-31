@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 import unittest
 
+from ck_engine.game.scenario_loader import load_scenario, list_scenarios
 from ck_engine.game.simulation import GameSimulation
 
 
@@ -32,6 +33,33 @@ class ScenarioInvariantsTest(unittest.TestCase):
         for r in rulers:
             self.assertIn(r.id, self.sim.realm_laws, f"{r.name} 缺少王国法律")
             self.assertIsNotNone(self.sim.councils.get(r.id), f"{r.name} 缺少内阁")
+
+    def test_1453_rose_war_scenario_is_playable(self) -> None:
+        world = load_scenario("1453")
+        self.assertEqual(world.date.year, 1453)
+        self.assertEqual(len(world.map.counties), 8)
+        self.assertEqual(len(world.characters), 9)
+        self.assertIn("1453", {scenario["id"] for scenario in list_scenarios()})
+        simulation = GameSimulation("1453")
+        self.assertEqual(len(simulation.councils.by_ruler), 5)
+        self.assertTrue(any("玫瑰战争" in scenario["name"] for scenario in list_scenarios()))
+
+    def test_867_viking_scenario_has_core_conflict(self) -> None:
+        simulation = GameSimulation("867")
+        world = simulation.world
+        self.assertEqual(world.date.year, 867)
+        self.assertEqual(len(world.map.counties), 8)
+        alfred = next(c for c in world.alive_characters() if "阿尔弗雷德" in c.name)
+        ivar = next(c for c in world.alive_characters() if "无骨者伊瓦尔" in c.name)
+        burgred = next(c for c in world.alive_characters() if "伯格雷德" in c.name)
+        self.assertTrue(simulation.diplomacy.flags(alfred.id, ivar.id).rival)
+        self.assertTrue(simulation.diplomacy.claims_of(ivar.id))
+        self.assertTrue(
+            any(
+                {treaty.a, treaty.b} == {alfred.id, burgred.id}
+                for treaty in simulation.diplomacy.treaties
+            )
+        )
 
     def test_william_harold_rivalry_and_claim(self) -> None:
         william = next(c for c in self.w.alive_characters() if "威廉·征服者" in c.name)
