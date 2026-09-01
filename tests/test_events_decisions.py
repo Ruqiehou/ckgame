@@ -28,6 +28,46 @@ class EventsCatalogTest(unittest.TestCase):
             self.assertGreaterEqual(len(event.choices), 2)
             self.assertTrue(any(choice.effects for choice in event.choices))
 
+    def test_hundred_new_events_registered(self) -> None:
+        events = [event for event in builtin_events() if 47 <= event.id <= 146]
+        self.assertEqual(len(events), 100)
+        ids = [e.id for e in events]
+        self.assertEqual(len(ids), len(set(ids)))
+        for event in events:
+            self.assertGreaterEqual(len(event.choices), 2)
+            self.assertTrue(any(choice.effects for choice in event.choices))
+
+    def test_period_events_gated_by_year(self) -> None:
+        class _FakeDate:
+            def __init__(self, year: int) -> None:
+                self.year = year
+
+        class _FakeWorld:
+            def __init__(self, year: int) -> None:
+                self.date = _FakeDate(year)
+
+        expect = {
+            "viking": [867, 880],
+            "feudal": [950, 1066],
+            "crusade": [1096, 1200],
+            "plague": [1348, 1400],
+            "rose": [1455, 1500],
+        }
+        for period, years in expect.items():
+            for year in years:
+                self.assertTrue(
+                    EventEngine._period_matches(_FakeWorld(year), period),
+                    f"{period} 事件应在 {year} 年可用",
+                )
+        # 时代之外不可用
+        self.assertFalse(EventEngine._period_matches(_FakeWorld(1066), "viking"))
+        self.assertFalse(EventEngine._period_matches(_FakeWorld(867), "rose"))
+
+    def test_every_period_has_events(self) -> None:
+        periods = {e.period for e in builtin_events()}
+        for expected in ("viking", "feudal", "crusade", "plague", "rose"):
+            self.assertIn(expected, periods)
+
     def test_coinage_event_choice_applies_effects(self) -> None:
         simulation = GameSimulation()
         ruler = next(iter(simulation.world.rulers()))
