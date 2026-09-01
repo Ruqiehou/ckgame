@@ -57,6 +57,7 @@ class EventDef:
     min_gold: float = 0.0
     requires_married: bool = False
     requires_children: bool = False
+    period: str = "all"
 
 
 @dataclass
@@ -82,9 +83,28 @@ class EventEngine:
     def tick_cooldowns(self) -> None:
         self.cooldowns = {k: v - 1 for k, v in self.cooldowns.items() if v > 1}
 
+    @staticmethod
+    def _period_matches(world: World, period: str) -> bool:
+        if period == "all":
+            return True
+        year = world.date.year
+        if period == "viking" and year < 900:
+            return True
+        if period == "feudal" and 900 <= year < 1100:
+            return True
+        if period == "crusade" and 1096 <= year < 1300:
+            return True
+        if period == "plague" and 1300 <= year < 1450:
+            return True
+        if period == "rose" and 1450 <= year < 1520:
+            return True
+        return False
+
     def _eligible(self, world: World, who: int, ev: EventDef) -> bool:
         c = world.character(who)
         if not c or not c.is_alive():
+            return False
+        if not self._period_matches(world, ev.period):
             return False
         if ev.requires_ruler and not c.is_ruler:
             return False
