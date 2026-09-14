@@ -145,5 +145,106 @@ class ScenarioInvariantsTest(unittest.TestCase):
         )
 
 
+    def test_1042_confessor_scenario_has_three_claimants(self) -> None:
+        """1042 忏悔者爱德华场景：一顶王冠、三家主张，且国王无地可依。"""
+        self.assertIn("1042", {s["id"] for s in list_scenarios()})
+        simulation = GameSimulation("1042")
+        world = simulation.world
+        self.assertEqual(world.date.year, 1042)
+        dip = simulation.diplomacy
+        england = next(t.id for t in world.titles.values() if t.name == "英格兰王国")
+
+        edward = next(c for c in world.alive_characters() if "爱德华国王" in c.name)
+        magnus = next(c for c in world.alive_characters() if "马格努斯" in c.name)
+        william = next(c for c in world.alive_characters() if "诺曼底的威廉" in c.name)
+        exile = next(c for c in world.alive_characters() if "流亡者爱德华" in c.name)
+
+        # 挪威的马格努斯依哈德克努特之约宣称英格兰，并与爱德华敌对
+        self.assertTrue(dip.flags(edward.id, magnus.id).rival, "爱德华与马格努斯应为世仇")
+        for claimant, who in ((magnus, "马格努斯"), (william, "诺曼底的威廉"), (exile, "流亡者爱德华")):
+            self.assertTrue(
+                any(claim.title == england for claim in dip.claims_of(claimant.id)),
+                f"{who} 缺少对英格兰王位的宣称",
+            )
+        # 无地的国王倚仗诺曼底
+        self.assertTrue(dip.are_allied(edward.id, william.id), "爱德华应与诺曼底结盟")
+        # 戈德温手握四郡，远超王室直辖两郡
+        godwin = next(c for c in world.alive_characters() if "戈德温伯爵" in c.name)
+        self.assertGreater(
+            len(godwin.held_titles), len(edward.held_titles), "戈德温应强于国王"
+        )
+
+    def test_1087_conquerors_legacy_has_brother_rivalry(self) -> None:
+        """1087 征服者的遗产：三子分家，长幼相争，1088 叛乱集团已成形。"""
+        self.assertIn("1087", {s["id"] for s in list_scenarios()})
+        simulation = GameSimulation("1087")
+        world = simulation.world
+        self.assertEqual(world.date.year, 1087)
+        dip = simulation.diplomacy
+        england = next(t.id for t in world.titles.values() if t.name == "英格兰王国")
+        normandy = next(t.id for t in world.titles.values() if t.name == "诺曼底公国")
+
+        robert = next(c for c in world.alive_characters() if "罗伯特·柯索斯" in c.name)
+        rufus = next(c for c in world.alive_characters() if "威廉·鲁弗斯" in c.name)
+        henry = next(c for c in world.alive_characters() if "亨利·博克莱尔" in c.name)
+        odo = next(c for c in world.alive_characters() if "巴约的奥多" in c.name)
+        mortain = next(c for c in world.alive_characters() if "莫尔坦" in c.name)
+
+        # 长子权之争：双向宣称 + 世仇
+        self.assertTrue(dip.flags(robert.id, rufus.id).rival, "罗伯特与鲁弗斯应为世仇")
+        self.assertTrue(
+            any(claim.title == england for claim in dip.claims_of(robert.id)),
+            "罗伯特缺少对英格兰的宣称",
+        )
+        self.assertTrue(
+            any(claim.title == normandy for claim in dip.claims_of(rufus.id)),
+            "鲁弗斯缺少对诺曼底的宣称",
+        )
+        # 1088 年叛乱集团：幼弟与长兄结盟，奥多与莫尔坦响应
+        for ally in (henry, odo, mortain):
+            self.assertTrue(
+                dip.are_allied(robert.id, ally.id), f"罗伯特应与 {ally.name} 结盟"
+            )
+        # 亨利只得到贝叶一郡，且是兄长的封臣
+        self.assertEqual(len(henry.held_titles), 1, "亨利应只有一块封地")
+
+    def test_1337_hundred_years_war_starts_at_war(self) -> None:
+        """1337 百年战争：开局当日即已开战，且老同盟从北方牵制英格兰。"""
+        self.assertIn("1337", {s["id"] for s in list_scenarios()})
+        simulation = GameSimulation("1337")
+        world = simulation.world
+        self.assertEqual(world.date.year, 1337)
+        dip = simulation.diplomacy
+        france = next(t.id for t in world.titles.values() if t.name == "法兰西王国")
+        aquitaine = next(t.id for t in world.titles.values() if t.name == "阿基坦公国")
+
+        edward = next(c for c in world.alive_characters() if "爱德华三世" in c.name)
+        philip = next(c for c in world.alive_characters() if "腓力六世" in c.name)
+        david = next(c for c in world.alive_characters() if "大卫二世" in c.name)
+
+        self.assertTrue(dip.flags(edward.id, philip.id).rival, "爱德华三世与腓力六世应为世仇")
+        self.assertTrue(
+            any(claim.title == france for claim in dip.claims_of(edward.id)),
+            "爱德华三世缺少对法兰西王位的宣称",
+        )
+        self.assertTrue(
+            any(claim.title == aquitaine for claim in dip.claims_of(philip.id)),
+            "腓力六世缺少对阿基坦的宣称",
+        )
+        # 老同盟：苏格兰与法兰西
+        self.assertTrue(dip.are_allied(david.id, philip.id), "苏格兰与法兰西应结盟")
+        # 开局即处于战争状态
+        wars = [
+            w
+            for w in simulation.wars.active_wars()
+            if {w.attacker_primary, w.defender_primary} == {edward.id, philip.id}
+        ]
+        self.assertTrue(wars, "1337 年 11 月百年战争应已爆发")
+        self.assertEqual(wars[0].name, "百年战争")
+        self.assertTrue(dip.flags(edward.id, philip.id).at_war, "双方应处于战争状态")
+        # 英格兰在欧陆的立足点：阿基坦由英王持有，却是法王的封臣
+        self.assertIn(aquitaine, edward.held_titles, "爱德华三世应持有阿基坦")
+
+
 if __name__ == "__main__":
     unittest.main()

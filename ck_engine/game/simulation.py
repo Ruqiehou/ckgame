@@ -142,6 +142,200 @@ class GameSimulation:
             if philip and normandy:
                 self.diplomacy.add_claim(philip, normandy, strength=85)
 
+        if self.scenario_id == "1042":
+            edward = next(
+                (c.id for c in self.world.alive_characters() if "爱德华国王" in c.name),
+                None,
+            )
+            magnus = next(
+                (c.id for c in self.world.alive_characters() if "马格努斯" in c.name),
+                None,
+            )
+            william_normandy = next(
+                (c.id for c in self.world.alive_characters() if "诺曼底的威廉" in c.name),
+                None,
+            )
+            edward_exile = next(
+                (c.id for c in self.world.alive_characters() if "流亡者爱德华" in c.name),
+                None,
+            )
+            eustace = next(
+                (c.id for c in self.world.alive_characters() if "尤斯塔斯" in c.name),
+                None,
+            )
+            henry_fr = next(
+                (c.id for c in self.world.alive_characters() if "亨利一世" in c.name),
+                None,
+            )
+            eng = next(
+                (t.id for t in self.world.titles.values() if t.name == "英格兰王国"),
+                None,
+            )
+            # 马格努斯依哈德克努特之约，自认英格兰的合法继承人
+            if edward and magnus:
+                self.diplomacy.set_rival(edward, magnus)
+                if eng:
+                    self.diplomacy.add_claim(magnus, eng, strength=75)
+            # 一顶没有明确继承人的王冠：诺曼底与流亡王族各有主张
+            if william_normandy and eng:
+                self.diplomacy.add_claim(william_normandy, eng, strength=50)
+            if edward_exile and eng:
+                self.diplomacy.add_claim(edward_exile, eng, strength=60)
+            # 无地的国王只能倚仗海峡对岸
+            if edward and william_normandy:
+                self.diplomacy.form_alliance(edward, william_normandy, self.world.date)
+            if edward and eustace:
+                self.diplomacy.form_alliance(edward, eustace, self.world.date)
+            # 法王与诺曼底公爵的旧怨
+            if henry_fr and william_normandy:
+                self.diplomacy.set_rival(henry_fr, william_normandy)
+
+        if self.scenario_id == "1087":
+            robert = next(
+                (c.id for c in self.world.alive_characters() if "罗伯特·柯索斯" in c.name),
+                None,
+            )
+            rufus = next(
+                (c.id for c in self.world.alive_characters() if "威廉·鲁弗斯" in c.name),
+                None,
+            )
+            henry = next(
+                (c.id for c in self.world.alive_characters() if "亨利·博克莱尔" in c.name),
+                None,
+            )
+            odo = next(
+                (c.id for c in self.world.alive_characters() if "巴约的奥多" in c.name),
+                None,
+            )
+            mortain = next(
+                (c.id for c in self.world.alive_characters() if "莫尔坦" in c.name),
+                None,
+            )
+            warrenne = next(
+                (c.id for c in self.world.alive_characters() if "沃伦" in c.name),
+                None,
+            )
+            malcolm = next(
+                (c.id for c in self.world.alive_characters() if "马尔科姆" in c.name),
+                None,
+            )
+            philip = next(
+                (c.id for c in self.world.alive_characters() if "腓力一世" in c.name),
+                None,
+            )
+            fulk = next(
+                (c.id for c in self.world.alive_characters() if "富尔克" in c.name),
+                None,
+            )
+            eng = next(
+                (t.id for t in self.world.titles.values() if t.name == "英格兰王国"),
+                None,
+            )
+            normandy = next(
+                (t.id for t in self.world.titles.values() if t.name == "诺曼底公国"),
+                None,
+            )
+            maine = next(
+                (t.id for t in self.world.titles.values() if t.name == "曼恩伯国"),
+                None,
+            )
+            # 长子权之争：罗伯特认为英格兰本应属于他
+            if robert and rufus:
+                self.diplomacy.set_rival(robert, rufus)
+                if eng:
+                    self.diplomacy.add_claim(robert, eng, strength=75)
+                if normandy:
+                    self.diplomacy.add_claim(rufus, normandy, strength=60)
+            # 1088 年叛乱集团：幼弟亨利与长兄罗伯特结盟，奥多与莫尔坦响应
+            if robert and henry:
+                self.diplomacy.form_alliance(robert, henry, self.world.date)
+            if robert and odo:
+                self.diplomacy.form_alliance(robert, odo, self.world.date)
+            if robert and mortain:
+                self.diplomacy.form_alliance(robert, mortain, self.world.date)
+            if rufus and warrenne:
+                self.diplomacy.form_alliance(rufus, warrenne, self.world.date)
+            if malcolm and rufus:
+                self.diplomacy.set_rival(malcolm, rufus)
+            if philip and rufus:
+                self.diplomacy.set_rival(philip, rufus)
+            # 安茹对曼恩的旧宣称
+            if fulk and maine:
+                self.diplomacy.add_claim(fulk, maine, strength=60)
+
+        if self.scenario_id == "1337":
+            edward = next(
+                (c.id for c in self.world.alive_characters() if "爱德华三世" in c.name),
+                None,
+            )
+            philip = next(
+                (c.id for c in self.world.alive_characters() if "腓力六世" in c.name),
+                None,
+            )
+            david = next(
+                (c.id for c in self.world.alive_characters() if "大卫二世" in c.name),
+                None,
+            )
+            balliol = next(
+                (c.id for c in self.world.alive_characters() if "巴里奥尔" in c.name),
+                None,
+            )
+            artevelde = next(
+                (c.id for c in self.world.alive_characters() if "阿特威尔德" in c.name),
+                None,
+            )
+            navarre = next(
+                (c.id for c in self.world.alive_characters() if "纳瓦拉的让娜" in c.name),
+                None,
+            )
+            france = next(
+                (t.id for t in self.world.titles.values() if t.name == "法兰西王国"),
+                None,
+            )
+            aquitaine = next(
+                (t.id for t in self.world.titles.values() if t.name == "阿基坦公国"),
+                None,
+            )
+            flanders = next(
+                (t.id for t in self.world.titles.values() if t.name == "佛兰德伯国"),
+                None,
+            )
+            if edward and philip:
+                self.diplomacy.set_rival(edward, philip)
+                # 爱德华三世以腓力四世外孙之名，宣称法兰西王位
+                if france:
+                    self.diplomacy.add_claim(edward, france, strength=95)
+                if aquitaine:
+                    self.diplomacy.add_claim(philip, aquitaine, strength=80)
+            if edward and flanders:
+                self.diplomacy.add_claim(edward, flanders, strength=55)
+            if navarre and france:
+                self.diplomacy.add_claim(navarre, france, strength=40)
+            # 老同盟：苏格兰与法兰西南北夹击英格兰
+            if david and edward:
+                self.diplomacy.set_rival(david, edward)
+            if david and philip:
+                self.diplomacy.form_alliance(david, philip, self.world.date)
+            if edward and balliol:
+                self.diplomacy.form_alliance(edward, balliol, self.world.date)
+            if edward and artevelde:
+                self.diplomacy.form_alliance(edward, artevelde, self.world.date)
+            # 1337 年 11 月：百年战争在开局当日即已爆发
+            if (
+                edward
+                and philip
+                and self.diplomacy.can_declare_war(edward, philip, self.world.date.year)
+            ):
+                self.wars.declare_war(
+                    CasusBelli.CLAIM,
+                    edward,
+                    philip,
+                    self.world.date,
+                    "百年战争",
+                    target_title=france if france else NONE_ID,
+                )
+                self.diplomacy.set_at_war(edward, philip, True)
+
         edwin = next((c.id for c in self.world.alive_characters() if "埃德温" in c.name), None)
         morcar = next((c.id for c in self.world.alive_characters() if "莫卡" in c.name), None)
         if edwin and morcar:
