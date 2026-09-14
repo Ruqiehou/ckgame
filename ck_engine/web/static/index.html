@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CK 游戏信息面板</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+<header>
+  <h1>⚔ CK 信息面板</h1>
+  <div class="meta" id="meta-bar">
+    <span>日期 <b id="meta-date">—</b></span>
+    <span>季节 <b id="meta-season">—</b></span>
+    <span>Tick <b id="meta-tick">—</b></span>
+    <span>场景 <b id="meta-scenario">—</b></span>
+  </div>
+  <div class="tools">
+    <label>场景 <select id="sel-scenario"></select></label>
+    <button id="btn-newgame">新游戏</button>
+    <span class="sep"></span>
+    <label>玩家 <select id="sel-player"></select></label>
+    <button id="btn-setplayer">切换</button>
+    <span class="sep"></span>
+    <button class="primary" data-days="1">+1天</button>
+    <button data-days="7">+7天</button>
+    <button data-days="30">+30天</button>
+    <span class="sep"></span>
+    <input id="inp-save" placeholder="存档名" maxlength="40">
+    <button id="btn-save">存档</button>
+    <select id="sel-load"><option value="">— 读档 —</option></select>
+    <button id="btn-load">读档</button>
+  </div>
+</header>
+<main>
+  <aside class="sidebar">
+    <section class="card" id="player-card"></section>
+    <section class="card" id="events-card"></section>
+    <section class="card" id="log-card"></section>
+  </aside>
+  <section class="content">
+    <nav class="tabs">
+      <button class="tab active" data-tab="characters">人物</button>
+      <button class="tab" data-tab="counties">领地</button>
+      <button class="tab" data-tab="military">军事</button>
+      <button class="tab" data-tab="politics">政治</button>
+      <button class="tab" data-tab="gameplays">玩法</button>
+      <button class="tab" data-tab="family">家族</button>
+    </nav>
+    <div id="tab-characters" class="tabpage active"></div>
+    <div id="tab-counties" class="tabpage"></div>
+    <div id="tab-military" class="tabpage"></div>
+    <div id="tab-politics" class="tabpage"></div>
+    <div id="tab-gameplays" class="tabpage"></div>
+    <div id="tab-family" class="tabpage"></div>
+  </section>
+</main>
+<footer>点击 ⚔ 标题刷新 · 操作后自动刷新 · 每 3 秒自动轮询</footer>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>
