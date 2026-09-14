@@ -21,9 +21,10 @@
 
 ## 事件
 
-- 内置 32 个事件，按权重月度抽检触发，部分事件有前置条件（已婚、金币下限等）
+- 内置 142 个事件，按权重月度抽检触发，部分事件有前置条件（已婚、金币下限等）
 - 玩家通过 `resolve_event` 手动选择；AI 君主按选项权重自动决议
 - 效果覆盖金币、威望、虔诚、压力、健康等
+- 事件定义集中在 `events/engine.py` 的 `builtin_events()`；多阶段剧情线（10 条）定义在 `events/storylines.py`
 
 ## 事件链
 
@@ -57,7 +58,7 @@
 | 颁授特许状 | 领土 | 120 金 | 5 年 |
 
 - 需满足前置条件（如拥有公国/王国头衔、基督徒身份、多省领地），不满足时不可执行
-- 通过 `execute_decision` 动作执行；冷却期与历史记录随存档保存
+- 通过 `execute_decision` 动作执行（payload 键名为 `decision_id`，如 `{"action": "execute_decision", "decision_id": "hold_tournament"}`）；冷却期与历史记录随存档保存
 
 ## 家族与教育
 

@@ -527,8 +527,8 @@ class GameAPI(SnapshotMixin, SaveGameMixin, DiplomacyActionsMixin):
                 county = self.sim.world.map.get(county_id)
         if self.sim.wars.armies_of(self.player_id):
             raise ValueError("已有野战军，请先解散或用现有军团")
-        levies = max(100, county.monthly_levies() * 3)
-        # 汇总玩家全部征召
+        levies = 0
+        # 汇总玩家全部领地的征召能力
         total = 0
         for c in self.sim.world.map.iter():
             if c.holder == self.player_id:

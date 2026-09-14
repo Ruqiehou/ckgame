@@ -18,7 +18,7 @@
 
 ### 状态
 
-- `snapshot()`：返回完整游戏快照，包含 `player`、`date`、`season`、`characters`、`counties`、`armies`、`wars`、`claims`、`treaties`、`pending_events`、`pending_ultimatums`、`decisions`（可执行的重大决策）、`chains`（事件链进度）、`tutorial`、`log` 等字段。
+- `snapshot()`：返回完整游戏快照，包含 `player`、`date`、`season`、`characters`、`counties`、`armies`、`wars`、`player_claims`、`treaties`、`pending_events`、`pending_ultimatums`、`decisions`（可执行的重大决策）、`chains`（事件链进度）、`storylines`（剧情线）、`gameplays`（玩法状态）、`trade_routes`、`family`、`tutorial`、`log` 等字段。
 
 ### 操作
 
@@ -49,7 +49,7 @@
 - `resolve_event`：处理弹出事件
 - `respond_ultimatum`：回应派系最后通牒（`{"action": "respond_ultimatum", "faction_id": 1, "accept": true}`；接受则落实诉求，拒绝则立即叛乱）
 - `appease_faction`：安抚派系
-- `execute_decision`：执行重大决策（如 `{"action": "execute_decision", "id": "hold_tournament"}`；不满足条件或冷却中会报错）
+- `execute_decision`：执行重大决策（如 `{"action": "execute_decision", "decision_id": "hold_tournament"}`；注意键名是 `decision_id` 而非 `id`，不满足条件或冷却中会报错）
 - `arrange_marriage` / `arrange_child_marriage` / `break_engagement`：联姻与婚约管理
 - `set_child_education`：为未成年子女指定教育方向（`{"action": "set_child_education", "child_id": 5, "focus": "martial"}`）
 - `tutorial_next` / `tutorial_skip`：教程推进与跳过

@@ -2,7 +2,7 @@
 
 ## 环境
 
-- Python 3.12+
+- Python 3.10+
 - 依赖：标准库 + pytest
 
 ## 运行
@@ -42,4 +42,4 @@ pyinstaller --name CKGameTUI --onefile ck_engine/game/tui.py
 A: 修改 `core/balance.py` 中的常量
 
 **Q: 如何添加新事件？**
-A: 在 `events/storylines.py` 中扩展剧情定义
+A: 在 `events/engine.py` 的 `builtin_events()` 中新增 `EventDef`（含标题、权重、选项与效果）；多阶段剧情请扩展 `events/event_chains.py`（事件链）或 `events/storylines.py`（剧情线）

@@ -108,6 +108,40 @@ class GameSimulation:
             if alfred and burgred:
                 self.diplomacy.form_alliance(alfred, burgred, self.world.date)
 
+        if self.scenario_id == "1200":
+            john = next(
+                (c.id for c in self.world.alive_characters() if "约翰" in c.name),
+                None,
+            )
+            arthur = next(
+                (c.id for c in self.world.alive_characters() if "阿蒂尔" in c.name),
+                None,
+            )
+            philip = next(
+                (c.id for c in self.world.alive_characters() if "腓力二世" in c.name),
+                None,
+            )
+            eng = next(
+                (t.id for t in self.world.titles.values() if "英格兰" in t.name),
+                None,
+            )
+            normandy = next(
+                (t.id for t in self.world.titles.values() if "诺曼底" in t.name),
+                None,
+            )
+            # 约翰 vs 侄儿阿蒂尔：布列塔尼派对英格兰王位的争夺
+            if john and arthur:
+                self.diplomacy.set_rival(john, arthur)
+                if eng:
+                    self.diplomacy.add_claim(arthur, eng, strength=70)
+            # 约翰 vs 腓力二世：安茹遗产的封建宗主之争
+            if john and philip:
+                self.diplomacy.set_rival(john, philip)
+            if arthur and philip:
+                self.diplomacy.form_alliance(arthur, philip, self.world.date)
+            if philip and normandy:
+                self.diplomacy.add_claim(philip, normandy, strength=85)
+
         edwin = next((c.id for c in self.world.alive_characters() if "埃德温" in c.name), None)
         morcar = next((c.id for c in self.world.alive_characters() if "莫卡" in c.name), None)
         if edwin and morcar:
