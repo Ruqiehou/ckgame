@@ -3,6 +3,14 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+*.coverage
+coverage.xml
+htmlcov/
+
+# 本地环境配置
+.env
+.env.*
+!.env.example
 
 # Java
 ckgame-java/target/
@@ -16,6 +24,10 @@ ck_engine/saves/*.json
 .vscode/
 Thumbs.db
 .DS_Store
+
+# 本地工具与日志
+.zcode/
+*.log
 
 # 助手工作区（本地记忆与技能，不入库）
 .workbuddy/

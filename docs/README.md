@@ -19,6 +19,7 @@ python/ 目录下包含统一结构的文档：
 ## 通用设计
 
 - **架构**：`GameSimulation` 主循环（按日推进、月度结算）+ `GameAPI` 统一接口（snapshot/action）
-- **界面**：TUI 命令行文字对话模式
+- **界面**：TUI 命令行文字对话模式 + 基于标准库 `http.server` 的 WebUI
 - **场景**：1066 年诺曼征服模拟器
 - **存档**：JSON 格式，存储于 `saves/` 目录
+- **测试**：使用 `python -m unittest discover -s tests -v` 运行标准库测试套件

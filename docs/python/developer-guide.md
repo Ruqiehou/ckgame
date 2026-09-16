@@ -3,7 +3,8 @@
 ## 环境
 
 - Python 3.10+
-- 依赖：标准库 + pytest
+- 运行依赖：仅 Python 标准库
+- 可选开发依赖：`pytest`（仅用于习惯 pytest 的运行方式）
 
 ## 运行
 
@@ -11,15 +12,32 @@
 python -m ck_engine.game.tui
 ```
 
+启动 WebUI：
+
+```bash
+python -m ck_engine.web.server
+# 浏览器访问 http://127.0.0.1:8000
+```
+
+可通过参数指定监听地址、端口和场景：
+
+```bash
+python -m ck_engine.web.server --host 127.0.0.1 --port 8000 --scenario 867
+```
+
 ## 测试
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+如果已安装 pytest，也可以运行：
 
 ```bash
 python -m pytest tests/ -v
 ```
 
-（无 pytest 时可用标准库运行：`python -m unittest discover -s tests -v`）
-
-覆盖：1066 场景构建不变量、主循环稳定性（按日/按月推进）、存档读档往返、派系最后通牒接受/拒绝闭环。
+测试覆盖：场景加载与构建不变量、主循环稳定性、GameAPI 操作边界、事件与决策、玩法、存档读档、派系最后通牒，以及 WebUI HTTP 路由。
 
 ## 打包
 
@@ -31,10 +49,11 @@ pyinstaller --name CKGameTUI --onefile ck_engine/game/tui.py
 
 ## 添加新功能
 
-1. 在对应包中创建新模块
-2. 在 `GameAPI` 中添加 action 处理
-3. 在 `GameTUI` 中添加菜单项
-4. 更新测试与文档
+1. 在对应包中创建新模块，并保持现有数据模型和错误处理风格
+2. 如果需要用户操作，在 `GameAPI` 中添加 action 处理
+3. 在 `GameTUI` 或 WebUI 中接入操作和状态展示
+4. 为正常路径、失败路径和存档往返补充测试
+5. 更新相关文档与场景数据说明
 
 ## 常见问题
 

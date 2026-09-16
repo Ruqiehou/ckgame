@@ -30,7 +30,7 @@
 
 常用操作：
 
-- `advance`：推进时间
+- `advance`：推进时间；`days` 会限制在 `1` 到 `365` 天之间
 - `declare_war`：宣战
 - `white_peace`：求和白和
 - `form_alliance`：结盟
@@ -53,6 +53,34 @@
 - `arrange_marriage` / `arrange_child_marriage` / `break_engagement`：联姻与婚约管理
 - `set_child_education`：为未成年子女指定教育方向（`{"action": "set_child_education", "child_id": 5, "focus": "martial"}`）
 - `tutorial_next` / `tutorial_skip`：教程推进与跳过
+
+`action()` 会返回操作后的完整快照。业务校验失败不会向调用方抛出异常，错误会写入快照的 `messages`；例如金币不足、玩法冷却中或决策前提不满足。未知 action 也会保留当前状态并返回提示。
+
+## WebUI HTTP 接口
+
+启动方式：
+
+```bash
+python -m ck_engine.web.server --host 127.0.0.1 --port 8000 --scenario 1066
+```
+
+主要路由：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/` | 返回 WebUI 页面 |
+| `GET` | `/static/<file>` | 返回静态资源 |
+| `GET` | `/api/snapshot` | 返回当前游戏快照 |
+| `GET` | `/api/scenarios` | 返回可用场景列表 |
+| `POST` | `/api/action` | 接收 JSON action 并返回新快照 |
+
+`POST /api/action` 的请求体必须是 JSON 对象，例如：
+
+```json
+{"action": "advance", "days": 30}
+```
+
+非法 JSON 或非对象请求体返回 HTTP 400；合法但业务失败的 action 仍返回快照，由 `messages` 描述失败原因。
 
 ## 地图
 
